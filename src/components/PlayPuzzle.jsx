@@ -7,6 +7,7 @@ import {
   resolveSide, validateGrid, dealPuzzle,
 } from "../engine/engine.js";
 import { buildShareText, shareResult } from "../lib/share.js";
+import { buildShareUrl } from "../lib/puzzleCodec.js";
 import Tutorial from "./Tutorial.jsx";
 
 const MAX_ATTEMPTS = 4;
@@ -52,7 +53,7 @@ const NAG_MESSAGES = [
   { emoji: "🏳️", text: "Out of attempts",  sub: "Solving it for you..." },
 ];
 
-export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBack }) {
+export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSave, onBack }) {
   const { colors, fallbackGrid } = puzzle;
 
   const [grid, setGrid]                     = useState(() => dealPuzzle(puzzle));
@@ -384,7 +385,8 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
   }
 
   async function onShare() {
-    const text = buildShareText({ name, revealed, history });
+    const url = source ? buildShareUrl(source) : undefined;
+    const text = buildShareText({ name, revealed, history, url });
     const r = await shareResult(text);
     setShareMsg(r === "failed" ? "Couldn't copy" : r === "shared" ? "Shared!" : "Copied!");
     setTimeout(() => setShareMsg(""), 2200);

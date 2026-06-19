@@ -14,7 +14,7 @@ function gridFromHistory(history) {
     .join("\n");
 }
 
-export function buildShareText({ name, dayNumber, revealed, history }) {
+export function buildShareText({ name, dayNumber, revealed, history, url }) {
   const heading =
     dayNumber != null ? `Square Up #${dayNumber}` : name ? `Square Up — ${name}` : "Square Up";
 
@@ -24,12 +24,13 @@ export function buildShareText({ name, dayNumber, revealed, history }) {
     ? "Gave up 🏳️"
     : `Solved in ${tries}/4 ✅`;
 
-  const url =
-    typeof window !== "undefined"
-      ? window.location.origin + window.location.pathname
-      : "";
+  // Prefer the puzzle's own share link (carries the whole puzzle) so the
+  // recipient can play the exact same one; fall back to the current page.
+  const link =
+    url ||
+    (typeof window !== "undefined" ? window.location.origin + window.location.pathname : "");
 
-  return [heading, grid, result, url].filter(Boolean).join("\n");
+  return [heading, grid, result, link].filter(Boolean).join("\n");
 }
 
 // Copy to clipboard, preferring the native share sheet on mobile.

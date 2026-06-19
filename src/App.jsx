@@ -122,6 +122,7 @@ export default function App() {
       puzzle={active.puzzle}
       subtitle={active.subtitle}
       name={active.name}
+      source={active.source}
       saved={active.saved}
       onSave={saveActive}
       onBack={() => setScreen("menu")}
