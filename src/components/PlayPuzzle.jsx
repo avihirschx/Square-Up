@@ -350,6 +350,17 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
     color: "#888", fontSize: "12px", padding: "5px 12px", cursor: "pointer",
   };
 
+  const centerCtrl = {
+    width: "70px", height: "30px", borderRadius: "8px",
+    background: "#15151f", color: "#8a8a9a", fontWeight: 600, fontSize: "12px",
+    border: "1px solid #2a2a3a", transition: "opacity 0.15s",
+  };
+
+  const sideLabel = (side) => ({
+    fontSize: "15px", fontWeight: 800, letterSpacing: "0.3px", textTransform: "uppercase",
+    color: sideLabelColor(side), transition: "color 0.4s",
+  });
+
   return (
     <div
       onPointerMove={onPointerMove}
@@ -429,21 +440,17 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
         </span>
       </div>
 
-      <div style={{ width: `${4 * CELL + 3 * GAP}px`, textAlign: "center", marginBottom: "4px", minHeight: "16px" }}>
-        <span style={{
-          fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase",
-          color: sideLabelColor("top"), transition: "color 0.4s",
-        }}>
+      <div style={{ width: `${4 * CELL + 3 * GAP}px`, textAlign: "center", marginBottom: "5px", minHeight: "20px" }}>
+        <span style={sideLabel("top")}>
           {activeSides ? activeSides.top : (correctSideMap?.has("top") ? correctSideMap.get("top") : "")}
         </span>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
         <div style={{
-          fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase",
-          color: sideLabelColor("left"), transition: "color 0.4s",
+          ...sideLabel("left"),
           writingMode: "vertical-rl", transform: "rotate(180deg)",
-          width: "20px", textAlign: "center",
+          width: "22px", textAlign: "center",
         }}>
           {activeSides ? activeSides.left : (correctSideMap?.has("left") ? correctSideMap.get("left") : "")}
         </div>
@@ -460,38 +467,47 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
               if (INNER_CELLS.has(`${r},${c}`)) {
                 if (r === 1 && c === 1) {
                   const clickable = !solved && !revealed && !solving;
-                  const SQ = 96;
                   return (
                     <div key="center" style={{
                       gridColumn: "2/4", gridRow: "2/4",
-                      display: "flex", alignItems: "center", justifyContent: "center",
+                      display: "flex", flexDirection: "column",
+                      alignItems: "center", justifyContent: "center", gap: "9px",
                     }}>
-                      <button
-                        aria-label={solved ? "Solved" : revealed ? "Answer" : "Check"}
-                        onClick={clickable ? checkSolution : undefined}
-                        style={{
-                          width: `${SQ}px`, height: `${SQ}px`, borderRadius: "14px", padding: 0,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          background: solved ? "#16351c" : revealed ? "#3a1414" : "#2EA84E",
-                          border: solved ? "1px solid #2f6b3a" : revealed ? "1px solid #6b2020" : "none",
-                          color: "#fff",
-                          cursor: clickable ? "pointer" : "default",
-                          boxShadow: clickable
-                            ? "0 8px 22px rgba(46,168,78,0.45), inset 0 1px 0 rgba(255,255,255,0.25)"
-                            : "none",
-                          transition: "transform 0.12s ease, box-shadow 0.2s, background 0.2s",
-                        }}>
-                        {solved ? (
-                          <span style={{ fontSize: "40px" }}>🎉</span>
-                        ) : revealed ? (
-                          <span style={{ fontSize: "36px" }}>😤</span>
-                        ) : (
-                          <svg width="50" height="50" viewBox="0 0 24 24" fill="none"
-                            stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="5 12.5 10 17.5 19 7" />
-                          </svg>
-                        )}
-                      </button>
+                      {solved ? (
+                        <span style={{ fontSize: "38px" }}>🎉</span>
+                      ) : revealed ? (
+                        <span style={{ fontSize: "34px" }}>😤</span>
+                      ) : (
+                        <>
+                          <button
+                            aria-label="Check"
+                            onClick={clickable ? checkSolution : undefined}
+                            style={{
+                              width: "150px", height: "42px", borderRadius: "10px", padding: 0,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              background: "#1d3326", border: "1px solid #2f5d3b",
+                              color: "#6cc585",
+                              cursor: clickable ? "pointer" : "default",
+                              opacity: clickable ? 1 : 0.5,
+                              transition: "background 0.15s, border-color 0.15s, opacity 0.15s",
+                            }}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                              stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="5 12.5 10 17.5 19 7" />
+                            </svg>
+                          </button>
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            <button onClick={shufflePuzzle} disabled={solving}
+                              style={{ ...centerCtrl, cursor: solving ? "default" : "pointer", opacity: solving ? 0.4 : 1 }}>
+                              Shuffle
+                            </button>
+                            <button onClick={resetPuzzle} disabled={solving}
+                              style={{ ...centerCtrl, cursor: solving ? "default" : "pointer", opacity: solving ? 0.4 : 1 }}>
+                              Reset
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   );
                 }
@@ -564,19 +580,15 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
         </div>
 
         <div style={{
-          fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase",
-          color: sideLabelColor("right"), transition: "color 0.4s",
-          writingMode: "vertical-rl", width: "20px", textAlign: "center",
+          ...sideLabel("right"),
+          writingMode: "vertical-rl", width: "22px", textAlign: "center",
         }}>
           {activeSides ? activeSides.right : (correctSideMap?.has("right") ? correctSideMap.get("right") : "")}
         </div>
       </div>
 
-      <div style={{ width: `${4 * CELL + 3 * GAP}px`, textAlign: "center", marginTop: "4px", marginBottom: "18px", minHeight: "16px" }}>
-        <span style={{
-          fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase",
-          color: sideLabelColor("bottom"), transition: "color 0.4s",
-        }}>
+      <div style={{ width: `${4 * CELL + 3 * GAP}px`, textAlign: "center", marginTop: "5px", marginBottom: "18px", minHeight: "20px" }}>
+        <span style={sideLabel("bottom")}>
           {activeSides ? activeSides.bottom : (correctSideMap?.has("bottom") ? correctSideMap.get("bottom") : "")}
         </span>
       </div>
@@ -637,7 +649,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
         </div>
       )}
 
-      {(solved || revealed) ? (
+      {(solved || revealed) && (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", marginTop: "4px" }}>
           <div style={{ display: "flex", gap: "10px" }}>
             <button onClick={onShare} style={{
@@ -652,23 +664,6 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
             }}>Menu</button>
           </div>
           <div style={{ height: "16px", fontSize: "12px", color: "#5CC877", fontWeight: 700 }}>{shareMsg}</div>
-        </div>
-      ) : (
-        <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
-          <button onClick={shufflePuzzle} disabled={solving} style={{
-            padding: "10px 24px", borderRadius: "10px",
-            background: "#131320", color: "#888", fontWeight: 600, fontSize: "14px",
-            border: "1px solid #222232",
-            cursor: solving ? "default" : "pointer",
-            opacity: solving ? 0.35 : 1,
-          }}>Shuffle</button>
-          <button onClick={resetPuzzle} disabled={solving} style={{
-            padding: "10px 24px", borderRadius: "10px",
-            background: "#131320", color: "#888", fontWeight: 600, fontSize: "14px",
-            border: "1px solid #222232",
-            cursor: solving ? "default" : "pointer",
-            opacity: solving ? 0.35 : 1,
-          }}>Reset</button>
         </div>
       )}
 
