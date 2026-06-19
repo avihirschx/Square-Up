@@ -31,21 +31,6 @@ function shuffleArr(arr) {
   return a;
 }
 
-// Dihedral symmetries of a 4×4 grid (4 rotations × mirror) — used to orient a
-// reference solution to agree with already-confirmed sides.
-function rot90(g) {
-  const n = Array.from({ length: 4 }, () => Array(4).fill(null));
-  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) n[i][j] = g[3 - j][i];
-  return n;
-}
-function flipH(g) { return g.map((row) => [...row].reverse()); }
-function dihedral(g) {
-  const out = [];
-  let cur = g;
-  for (let k = 0; k < 4; k++) { out.push(cur, flipH(cur)); cur = rot90(cur); }
-  return out;
-}
-
 const NAG_MESSAGES = [
   { emoji: "😬", text: "Not quite",         sub: "That's not right..." },
   { emoji: "🤔", text: "Still off",         sub: "Keep trying!" },
@@ -68,7 +53,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
   const [showTutorial, setShowTutorial]     = useState(() => {
     try { return !localStorage.getItem("squareup.tutorialSeen"); } catch { return false; }
   });
-  const [hintsUsed, setHintsUsed]           = useState(0);
+  const [hints, setHints]                   = useState([]); // revealed category names
   const [history, setHistory]               = useState([]); // [top,right,bottom,left] per check
   const [wrongCount, setWrongCount]         = useState(0);
   const [nagVisible, setNagVisible]         = useState(false);
@@ -84,6 +69,9 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
   const pointerDrag = useRef(null);
   const nagTimer    = useRef(null);
   const cellEls     = useRef({});
+  const boardRef    = useRef(null);
+  const [boardNat, setBoardNat] = useState({ w: 0, h: 0 }); // natural board+labels size
+  const [vw, setVw] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 430));
 
   // Show the puzzle name in the browser tab / bookmark while it's open.
   // (Doesn't change chat-app link previews — those read static page meta.)
@@ -92,6 +80,19 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
     document.title = name ? `${name} — Square Up` : "Square Up";
     return () => { document.title = prev; };
   }, [name]);
+
+  // Measure the board's natural size once, and track viewport width, so the
+  // whole board (incl. the vertical side labels) scales to fit narrow phones.
+  useEffect(() => {
+    const el = boardRef.current;
+    if (el) setBoardNat({ w: el.offsetWidth, h: el.offsetHeight });
+    const onResize = () => setVw(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // Scale down so the board + side labels never get clipped (16px page padding).
+  const boardScale = boardNat.w ? Math.min(1, (vw - 32) / boardNat.w) : 1;
 
   const activeSides = solvedSides || revealedSides;
   const isAnimating = Object.keys(swapAnim).length > 0;
@@ -374,7 +375,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
     setSelected(null);
     setSolved(false); setSolvedSides(null);
     setSatisfiedSides({});
-    setHintsUsed(0); setHistory([]);
+    setHints([]); setHistory([]);
     setWrongCount(0); setNagVisible(false); setShake(false);
     setRevealed(false); setRevealedSides(null); setRevealAnim(false);
     setSwapAnim({}); setDragState(null); setSolveAnim(false);
@@ -397,48 +398,15 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
     try { localStorage.setItem("squareup.tutorialSeen", "1"); } catch {}
   }
 
-  // A reference solution oriented to agree with the sides already confirmed.
-  function consistentSolution() {
-    const base = fallbackGrid;
-    if (!base) return null;
-    const confirmed = Object.keys(satisfiedSides);
-    if (!confirmed.length) return base;
-    for (const T of dihedral(base)) {
-      if (confirmed.every((s) => resolveSide(puzzle, T, s) === satisfiedSides[s])) return T;
-    }
-    return base;
-  }
-
-  // Hint: solve one not-yet-confirmed side by sliding its tiles into place,
-  // then confirm it. Never disturbs an already-confirmed side's words.
+  // Hint: name one category (without revealing which words belong to it).
+  // Prefers a category you haven't confirmed or already been told.
   function useHint() {
-    if (hintsUsed >= MAX_HINTS || solved || revealed || solving || isAnimating) return;
-    const T = consistentSolution();
-    if (!T) return;
-    const side = ["top", "right", "bottom", "left"].find((s) => !satisfiedSides[s]);
-    if (!side) return;
-
-    const cur = grid.map((row) => [...row]);
-    const swaps = [];
-    for (const [r, c] of SIDE_CELLS[side]) {
-      const want = T[r][c];
-      if (cur[r][c] === want) continue;
-      let loc = null;
-      for (const [rr, cc] of OUTER_CELLS) { if (cur[rr][cc] === want) { loc = [rr, cc]; break; } }
-      if (!loc) continue;
-      swaps.push([r, c, loc[0], loc[1]]);
-      [cur[r][c], cur[loc[0]][loc[1]]] = [cur[loc[0]][loc[1]], cur[r][c]];
-    }
-
-    setHintsUsed((n) => n + 1);
-    setSelected(null);
-    if (!swaps.length) { setSatisfiedSides(computeSatisfied(grid)); return; }
-
-    setSolving(true);
-    let t = 0;
-    const STEP = 320;
-    for (const [r1, c1, r2, c2] of swaps) { setTimeout(() => animateSwap(r1, c1, r2, c2), t); t += STEP; }
-    setTimeout(() => { setSatisfiedSides(computeSatisfied(cur)); setSolving(false); }, t + 160);
+    if (hints.length >= MAX_HINTS || solved || revealed) return;
+    const known = new Set([...hints, ...Object.values(satisfiedSides)]);
+    const pick =
+      puzzle.catNames.find((c) => !known.has(c)) ||
+      puzzle.catNames.find((c) => !hints.includes(c));
+    if (pick) setHints((h) => [...h, pick]);
   }
 
   function getCellColors(r, c) {
@@ -551,17 +519,32 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
           How to play
         </button>
         {!solved && !revealed && (
-          <button onClick={useHint} disabled={hintsUsed >= MAX_HINTS || solving}
+          <button onClick={useHint} disabled={hints.length >= MAX_HINTS}
             style={{
               ...ghostBtn, padding: "4px 12px",
-              color: hintsUsed >= MAX_HINTS ? "#444" : "#cfa93a",
-              borderColor: hintsUsed >= MAX_HINTS ? "#222232" : "#3a3018",
-              cursor: hintsUsed >= MAX_HINTS || solving ? "default" : "pointer",
+              color: hints.length >= MAX_HINTS ? "#444" : "#cfa93a",
+              borderColor: hints.length >= MAX_HINTS ? "#222232" : "#3a3018",
+              cursor: hints.length >= MAX_HINTS ? "default" : "pointer",
             }}>
-            💡 Hint{hintsUsed < MAX_HINTS ? ` (${MAX_HINTS - hintsUsed})` : ""}
+            💡 Hint{hints.length < MAX_HINTS ? ` (${MAX_HINTS - hints.length})` : ""}
           </button>
         )}
       </div>
+
+      {hints.length > 0 && (
+        <div style={{
+          background: "#1a160a", border: "1px solid #3a3018", borderRadius: "12px",
+          padding: "10px 16px", maxWidth: "420px", width: "100%", marginBottom: "16px",
+          fontSize: "13px", color: "#cbb26a", lineHeight: 1.7,
+        }}>
+          <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "#8a7a44", marginBottom: "2px" }}>
+            {hints.length === 1 ? "One of the categories is" : "Categories include"}
+          </div>
+          {hints.map((cat) => (
+            <div key={cat}>💡 <strong style={{ color: "#e6c766" }}>{cat}</strong></div>
+          ))}
+        </div>
+      )}
 
       <div style={{ display: "flex", alignItems: "center", gap: "9px", marginBottom: "16px", minHeight: "16px" }}>
         <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "#555" }}>
@@ -601,6 +584,18 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
           {(activeSides ? 4 : satisfiedCount)}/4
         </span>
       </div>
+
+      <div style={{
+        position: "relative",
+        width: boardNat.w ? boardNat.w * boardScale : undefined,
+        height: boardNat.h ? boardNat.h * boardScale : undefined,
+      }}>
+      <div ref={boardRef} style={{
+        position: boardNat.w ? "absolute" : "static", top: 0, left: 0,
+        display: "flex", flexDirection: "column", alignItems: "center",
+        transformOrigin: "top left",
+        transform: boardScale < 1 ? `scale(${boardScale})` : undefined,
+      }}>
 
       <div style={{ width: `${4 * CELL + 3 * GAP}px`, textAlign: "center", marginBottom: "5px", minHeight: "20px" }}>
         <span style={sideLabel("top")}>{sideLabelText("top")}</span>
@@ -767,6 +762,9 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
 
       <div style={{ width: `${4 * CELL + 3 * GAP}px`, textAlign: "center", marginTop: "5px", marginBottom: "18px", minHeight: "20px" }}>
         <span style={sideLabel("bottom")}>{sideLabelText("bottom")}</span>
+      </div>
+
+      </div>
       </div>
 
       <div style={{
