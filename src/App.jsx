@@ -6,6 +6,7 @@ import PlayPuzzle from "./components/PlayPuzzle.jsx";
 import { compileSource } from "./engine/builder.js";
 import { saveSource, updateSource, isSaved } from "./lib/storage.js";
 import { readSharedFromUrl, clearShareHash } from "./lib/puzzleCodec.js";
+import { FEATURED_SOURCE } from "./data/featured.js";
 
 let keySeq = 0;
 const nextKey = () => `p${++keySeq}`;
@@ -63,6 +64,11 @@ export default function App() {
     if (res.ok) playSource(rec, res.puzzle);
   }
 
+  function playFeatured() {
+    const res = compileSource(FEATURED_SOURCE);
+    if (res.ok) playSource(FEATURED_SOURCE, res.puzzle);
+  }
+
   function saveActive() {
     if (!active?.source) return;
     saveSource(active.source); // de-dupes if already saved
@@ -72,6 +78,8 @@ export default function App() {
   if (screen === "menu") {
     return (
       <MenuScreen
+        onPlayFeatured={playFeatured}
+        featuredTitle={FEATURED_SOURCE.title}
         onMyPuzzles={() => setScreen("myPuzzles")}
         onBuild={() => { setEditing(null); setScreen("build"); }}
       />

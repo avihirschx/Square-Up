@@ -1,14 +1,34 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   OUTER_CELLS, INNER_CELLS, SIDE_CELLS, CORNER_SIDES, GRID_CORNERS,
   CELL_SIDE, CELL, GAP,
 } from "../engine/geometry.js";
 import {
-  resolveSide, validateGrid, dealPuzzle, shuffleKeepingLocked,
+  resolveSide, validateGrid, dealPuzzle,
 } from "../engine/engine.js";
 import { buildShareText, shareResult } from "../lib/share.js";
+import Tutorial from "./Tutorial.jsx";
 
 const MAX_ATTEMPTS = 4;
+const MAX_HINTS = 2;
+
+// Corner split gradients, oriented so each side's color sits on the edge that
+// faces that side's other tiles (colors flow continuously into the sides).
+const CORNER_GRAD = {
+  "0,0": (col) => `linear-gradient(45deg, ${col.left} 50%, ${col.top} 50%)`,
+  "0,3": (col) => `linear-gradient(135deg, ${col.top} 50%, ${col.right} 50%)`,
+  "3,0": (col) => `linear-gradient(135deg, ${col.left} 50%, ${col.bottom} 50%)`,
+  "3,3": (col) => `linear-gradient(45deg, ${col.bottom} 50%, ${col.right} 50%)`,
+};
+
+function shuffleArr(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 const NAG_MESSAGES = [
   { emoji: "😬", text: "Not quite",         sub: "That's not right..." },
@@ -29,7 +49,11 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
   const [solvedSides, setSolvedSides]       = useState(null);
   const [solved, setSolved]                 = useState(false);
   const [shake, setShake]                   = useState(false);
-  const [showInstructions, setShowInstructions] = useState(false);
+  const [showTutorial, setShowTutorial]     = useState(() => {
+    try { return !localStorage.getItem("squareup.tutorialSeen"); } catch { return false; }
+  });
+  const [hints, setHints]                   = useState([]); // revealed category names
+  const [history, setHistory]               = useState([]); // [top,right,bottom,left] per check
   const [wrongCount, setWrongCount]         = useState(0);
   const [nagVisible, setNagVisible]         = useState(false);
   const [revealed, setRevealed]             = useState(false);
@@ -44,6 +68,14 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
   const pointerDrag = useRef(null);
   const nagTimer    = useRef(null);
   const cellEls     = useRef({});
+
+  // Show the puzzle name in the browser tab / bookmark while it's open.
+  // (Doesn't change chat-app link previews — those read static page meta.)
+  useEffect(() => {
+    const prev = document.title;
+    document.title = name ? `${name} — Square Up` : "Square Up";
+    return () => { document.title = prev; };
+  }, [name]);
 
   const activeSides = solvedSides || revealedSides;
   const isAnimating = Object.keys(swapAnim).length > 0;
@@ -264,13 +296,16 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
     if (valid) {
       setSatisfiedSides(valid.sideCategories);
       setSolvedSides(valid.sideCategories);
+      setHistory((h) => [...h, [true, true, true, true]]);
       setSolved(true);
       setTimeout(() => setSolveAnim(true), 500);
       return;
     }
 
     // Not solved: color whichever sides are full categories, count an attempt.
-    setSatisfiedSides(computeSatisfied(grid));
+    const sat = computeSatisfied(grid);
+    setSatisfiedSides(sat);
+    setHistory((h) => [...h, ["top", "right", "bottom", "left"].map((s) => !!sat[s])]);
     const newCount = wrongCount + 1;
     setWrongCount(newCount);
     setShake(true); setTimeout(() => setShake(false), 500);
@@ -284,10 +319,33 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
     }
   }
 
+  // Shuffle WITHIN each confirmed side (and among the free tiles), so completed
+  // sides stay completed — it only reorders, never tears a side apart.
   function shufflePuzzle() {
     if (solved || revealed || solving || isAnimating) return;
-    setGrid((prev) => shuffleKeepingLocked(prev, new Set())); // shuffle all 12
-    setSatisfiedSides({}); // board moved — clear the stale coloring
+    const groups = {};
+    for (const [r, c] of OUTER_CELLS) {
+      const key = `${r},${c}`;
+      const conf = confirmedSidesOf(key);
+      if (conf.length >= 2) continue;                 // confirmed corner — fixed
+      const id = conf.length === 1 ? `side:${conf[0]}` : "free";
+      (groups[id] ||= []).push(key);
+    }
+    setGrid((prev) => {
+      const next = prev.map((row) => [...row]);
+      for (const keys of Object.values(groups)) {
+        const words = shuffleArr(keys.map((k) => {
+          const [r, c] = k.split(",").map(Number);
+          return prev[r][c];
+        }));
+        keys.forEach((k, i) => {
+          const [r, c] = k.split(",").map(Number);
+          next[r][c] = words[i];
+        });
+      }
+      return next;
+    });
+    // keep satisfiedSides — completed sides remain completed
     setSelected(null);
     setSwapAnim({}); setDragState(null);
     setShake(false);
@@ -300,6 +358,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
     setSelected(null);
     setSolved(false); setSolvedSides(null);
     setSatisfiedSides({});
+    setHints([]); setHistory([]);
     setWrongCount(0); setNagVisible(false); setShake(false);
     setRevealed(false); setRevealedSides(null); setRevealAnim(false);
     setSwapAnim({}); setDragState(null); setSolveAnim(false);
@@ -310,49 +369,55 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
   }
 
   async function onShare() {
-    const text = buildShareText({ name, guesses, revealed });
+    const text = buildShareText({ name, revealed, history });
     const r = await shareResult(text);
     setShareMsg(r === "failed" ? "Couldn't copy" : r === "shared" ? "Shared!" : "Copied!");
     setTimeout(() => setShareMsg(""), 2200);
+  }
+
+  function closeTutorial() {
+    setShowTutorial(false);
+    try { localStorage.setItem("squareup.tutorialSeen", "1"); } catch {}
+  }
+
+  function useHint() {
+    if (hints.length >= MAX_HINTS || solved || revealed) return;
+    const revealedSet = new Set(hints);
+    const satisfiedCats = new Set(Object.values(satisfiedSides));
+    const pick =
+      puzzle.catNames.find((c) => !revealedSet.has(c) && !satisfiedCats.has(c)) ||
+      puzzle.catNames.find((c) => !revealedSet.has(c));
+    if (pick) setHints((h) => [...h, pick]);
   }
 
   function getCellColors(r, c) {
     const key = `${r},${c}`;
     const isCorner = GRID_CORNERS.has(key);
     const delay = OUTER_CELLS.findIndex(([or, oc]) => or === r && oc === c) * 55;
+    const entering = activeSides ? (revealed && !revealAnim) : false;
+    const catOf = (side) => (activeSides ? activeSides[side] : satisfiedSides[side]);
+    const DEFAULT = { bg: "#2a2a3c", gradient: null, textColor: "#f0f0f0", isCornerSplit: false, entering, delay };
 
-    // Full reveal (solved / answer shown): color every side.
-    if (activeSides) {
-      const entering = revealed && !revealAnim;
-      if (isCorner) {
-        const [bg1, bg2] = CORNER_SIDES[key].map((side) => colors[activeSides[side]].bg);
-        return { bg1, bg2, textColor: "#fff", isCornerSplit: true, entering, delay };
-      }
-      const side = CELL_SIDE[key];
-      return { bg1: colors[activeSides[side]].bg, bg2: null, textColor: "#fff", isCornerSplit: false, entering, delay };
-    }
-
-    // In progress: color satisfied sides from the last check.
     if (isCorner) {
-      const [sa, sb] = CORNER_SIDES[key];
-      const ca = satisfiedSides[sa];
-      const cb = satisfiedSides[sb];
-      if (ca && cb) {
-        // Both adjacent sides satisfied → confirmed corner, two colors.
-        return { bg1: colors[ca].bg, bg2: colors[cb].bg, textColor: "#fff", isCornerSplit: true, entering: false, delay };
+      const [sA, sB] = CORNER_SIDES[key];
+      const cA = catOf(sA), cB = catOf(sB);
+      if (cA && cB) {
+        // Both sides known → split, oriented so each color meets its side.
+        const col = { [sA]: colors[cA].bg, [sB]: colors[cB].bg };
+        return { bg: null, gradient: CORNER_GRAD[key](col), textColor: "#fff", isCornerSplit: true, entering, delay };
       }
-      const one = ca || cb;
-      if (one) {
-        return { bg1: colors[one].bg, bg2: null, textColor: colors[one].text, isCornerSplit: false, entering: false, delay };
+      const solo = cA || cB;
+      if (solo) {
+        return { bg: colors[solo].bg, gradient: null, textColor: activeSides ? "#fff" : colors[solo].text, isCornerSplit: false, entering, delay };
       }
-    } else {
-      const cat = satisfiedSides[CELL_SIDE[key]];
-      if (cat) {
-        return { bg1: colors[cat].bg, bg2: null, textColor: colors[cat].text, isCornerSplit: false, entering: false, delay };
-      }
+      return DEFAULT;
     }
 
-    return { bg1: "#2a2a3c", bg2: null, textColor: "#f0f0f0", isCornerSplit: false, entering: false, delay };
+    const cat = catOf(CELL_SIDE[key]);
+    if (cat) {
+      return { bg: colors[cat].bg, gradient: null, textColor: activeSides ? "#fff" : colors[cat].text, isCornerSplit: false, entering, delay };
+    }
+    return DEFAULT;
   }
 
   function sideLabelColor(side) {
@@ -430,24 +495,34 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
         </button>
       )}
 
-      <button onClick={() => setShowInstructions((v) => !v)} style={{ ...ghostBtn, color: "#666", padding: "4px 12px", marginBottom: "14px" }}>
-        {showInstructions ? "Hide" : "How to play"}
-      </button>
+      <div style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>
+        <button onClick={() => setShowTutorial(true)} style={{ ...ghostBtn, color: "#666", padding: "4px 12px" }}>
+          How to play
+        </button>
+        {!solved && !revealed && (
+          <button onClick={useHint} disabled={hints.length >= MAX_HINTS}
+            style={{
+              ...ghostBtn, padding: "4px 12px",
+              color: hints.length >= MAX_HINTS ? "#444" : "#cfa93a",
+              borderColor: hints.length >= MAX_HINTS ? "#222232" : "#3a3018",
+              cursor: hints.length >= MAX_HINTS ? "default" : "pointer",
+            }}>
+            💡 Hint{hints.length < MAX_HINTS ? ` (${MAX_HINTS - hints.length})` : ""}
+          </button>
+        )}
+      </div>
 
-      {showInstructions && (
+      {hints.length > 0 && (
         <div style={{
-          background: "#131320", border: "1px solid #222232", borderRadius: "12px",
-          padding: "14px 18px", maxWidth: "420px", width: "100%",
-          marginBottom: "18px", fontSize: "13px", color: "#999", lineHeight: "1.7",
+          background: "#1a160a", border: "1px solid #3a3018", borderRadius: "12px",
+          padding: "10px 16px", maxWidth: "420px", width: "100%", marginBottom: "16px",
+          fontSize: "12.5px", color: "#cbb26a", lineHeight: 1.7,
         }}>
-          <p style={{ margin: "0 0 8px", fontWeight: 700, color: "#ddd", fontSize: "14px" }}>How to play</p>
-          <ul style={{ margin: 0, paddingLeft: "18px" }}>
-            <li>All 12 words are on the board — swap them into place</li>
-            <li><strong>Tap</strong> two words to swap, or <strong>slide</strong> one onto another</li>
-            <li>A side lights up when its four words all belong to one category (any order)</li>
-            <li>A corner shows <strong>two colors</strong> once both of its sides are right</li>
-            <li>Hit the <strong>✓</strong> to check — you get 4 tries</li>
-          </ul>
+          {hints.map((cat) => (
+            <div key={cat}>
+              💡 <strong>{cat}:</strong> {puzzle.categoryWords[cat].join(", ")}
+            </div>
+          ))}
         </div>
       )}
 
@@ -586,7 +661,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
               const word = grid[r][c];
               const isSel = selected?.r === r && selected?.c === c;
               const anim = swapAnim[key];
-              const { bg1, bg2, textColor, isCornerSplit, entering, delay } = getCellColors(r, c);
+              const { bg, gradient, textColor, isCornerSplit, entering, delay } = getCellColors(r, c);
               const isDraggingThis = dragState && pointerDrag.current?.r === r && pointerDrag.current?.c === c;
               const fullyLocked = isFullyLocked(key);
 
@@ -606,11 +681,11 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
                     cursor: solved || revealed || fullyLocked ? "default" : "pointer",
                     userSelect: "none", padding: "4px", wordBreak: "break-word", lineHeight: "1.2",
                     position: "relative", touchAction: "none",
-                    background: isCornerSplit ? "transparent" : bg1,
+                    background: isCornerSplit ? "transparent" : bg,
                     color: textColor,
                     outline: isSel ? "3px solid #aaaaff" : "none",
                     outlineOffset: "-3px",
-                    boxShadow: isSel ? "0 0 0 3px rgba(170,170,255,0.4)" : (bg1 === "#2a2a3c" ? "0 2px 8px rgba(0,0,0,0.4)" : "none"),
+                    boxShadow: isSel ? "0 0 0 3px rgba(170,170,255,0.4)" : (bg === "#2a2a3c" ? "0 2px 8px rgba(0,0,0,0.4)" : "none"),
                     zIndex: anim ? 10 : "auto",
                     transform: anim
                       ? `translate(${anim.tx}px, ${anim.ty}px)`
@@ -629,15 +704,13 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
                   {isCornerSplit && (
                     <div style={{
                       position: "absolute", inset: 0, borderRadius: "10px",
-                      background: bg2
-                        ? `linear-gradient(135deg,${bg1} 50%,${bg2} 50%)`
-                        : bg1,
+                      background: gradient,
                       transition: "background 0.25s",
                     }} />
                   )}
                   <span style={{
                     position: "relative", zIndex: 1,
-                    textShadow: (activeSides || bg1 !== "#2a2a3c") ? "0 1px 3px rgba(0,0,0,0.35)" : "none",
+                    textShadow: (activeSides || isCornerSplit || (bg && bg !== "#2a2a3c")) ? "0 1px 3px rgba(0,0,0,0.35)" : "none",
                   }}>
                     {word}
                   </span>
@@ -728,6 +801,8 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
           {dragState.word}
         </div>
       )}
+
+      {showTutorial && <Tutorial onClose={closeTutorial} />}
     </div>
   );
 }

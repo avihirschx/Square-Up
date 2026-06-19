@@ -1,6 +1,6 @@
 import { countSaved } from "../lib/storage.js";
 
-export default function MenuScreen({ onMyPuzzles, onBuild }) {
+export default function MenuScreen({ onPlayFeatured, featuredTitle, onMyPuzzles, onBuild }) {
   const saved = countSaved();
 
   return (
@@ -28,10 +28,23 @@ export default function MenuScreen({ onMyPuzzles, onBuild }) {
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "14px", width: "100%", maxWidth: "300px" }}>
+        {onPlayFeatured && (
+          <button onClick={onPlayFeatured} style={{
+            padding: "16px", borderRadius: "14px",
+            background: "#2A7AE4", color: "#fff", fontWeight: 800, fontSize: "17px",
+            border: "none", cursor: "pointer", boxShadow: "0 6px 20px rgba(42,122,228,0.35)",
+            display: "flex", flexDirection: "column", gap: "2px",
+          }}>
+            <span>Today's puzzle</span>
+            {featuredTitle && (
+              <span style={{ fontSize: "12px", fontWeight: 600, opacity: 0.85 }}>{featuredTitle}</span>
+            )}
+          </button>
+        )}
         <button onClick={onBuild} style={{
           padding: "16px", borderRadius: "14px",
-          background: "#2A7AE4", color: "#fff", fontWeight: 800, fontSize: "17px",
-          border: "none", cursor: "pointer", boxShadow: "0 6px 20px rgba(42,122,228,0.35)",
+          background: "#16161f", color: "#ddd", fontWeight: 800, fontSize: "17px",
+          border: "1px solid #2c2c40", cursor: "pointer",
         }}>Build a puzzle</button>
         <button onClick={onMyPuzzles} style={{
           padding: "16px", borderRadius: "14px",
