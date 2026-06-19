@@ -30,6 +30,21 @@ function shuffleArr(arr) {
   return a;
 }
 
+// Dihedral symmetries of a 4×4 grid (4 rotations × mirror) — used to orient a
+// reference solution to agree with already-confirmed sides.
+function rot90(g) {
+  const n = Array.from({ length: 4 }, () => Array(4).fill(null));
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) n[i][j] = g[3 - j][i];
+  return n;
+}
+function flipH(g) { return g.map((row) => [...row].reverse()); }
+function dihedral(g) {
+  const out = [];
+  let cur = g;
+  for (let k = 0; k < 4; k++) { out.push(cur, flipH(cur)); cur = rot90(cur); }
+  return out;
+}
+
 const NAG_MESSAGES = [
   { emoji: "😬", text: "Not quite",         sub: "That's not right..." },
   { emoji: "🤔", text: "Still off",         sub: "Keep trying!" },
@@ -52,7 +67,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
   const [showTutorial, setShowTutorial]     = useState(() => {
     try { return !localStorage.getItem("squareup.tutorialSeen"); } catch { return false; }
   });
-  const [hints, setHints]                   = useState([]); // revealed category names
+  const [hintsUsed, setHintsUsed]           = useState(0);
   const [history, setHistory]               = useState([]); // [top,right,bottom,left] per check
   const [wrongCount, setWrongCount]         = useState(0);
   const [nagVisible, setNagVisible]         = useState(false);
@@ -358,7 +373,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
     setSelected(null);
     setSolved(false); setSolvedSides(null);
     setSatisfiedSides({});
-    setHints([]); setHistory([]);
+    setHintsUsed(0); setHistory([]);
     setWrongCount(0); setNagVisible(false); setShake(false);
     setRevealed(false); setRevealedSides(null); setRevealAnim(false);
     setSwapAnim({}); setDragState(null); setSolveAnim(false);
@@ -380,14 +395,48 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
     try { localStorage.setItem("squareup.tutorialSeen", "1"); } catch {}
   }
 
+  // A reference solution oriented to agree with the sides already confirmed.
+  function consistentSolution() {
+    const base = fallbackGrid;
+    if (!base) return null;
+    const confirmed = Object.keys(satisfiedSides);
+    if (!confirmed.length) return base;
+    for (const T of dihedral(base)) {
+      if (confirmed.every((s) => resolveSide(puzzle, T, s) === satisfiedSides[s])) return T;
+    }
+    return base;
+  }
+
+  // Hint: solve one not-yet-confirmed side by sliding its tiles into place,
+  // then confirm it. Never disturbs an already-confirmed side's words.
   function useHint() {
-    if (hints.length >= MAX_HINTS || solved || revealed) return;
-    const revealedSet = new Set(hints);
-    const satisfiedCats = new Set(Object.values(satisfiedSides));
-    const pick =
-      puzzle.catNames.find((c) => !revealedSet.has(c) && !satisfiedCats.has(c)) ||
-      puzzle.catNames.find((c) => !revealedSet.has(c));
-    if (pick) setHints((h) => [...h, pick]);
+    if (hintsUsed >= MAX_HINTS || solved || revealed || solving || isAnimating) return;
+    const T = consistentSolution();
+    if (!T) return;
+    const side = ["top", "right", "bottom", "left"].find((s) => !satisfiedSides[s]);
+    if (!side) return;
+
+    const cur = grid.map((row) => [...row]);
+    const swaps = [];
+    for (const [r, c] of SIDE_CELLS[side]) {
+      const want = T[r][c];
+      if (cur[r][c] === want) continue;
+      let loc = null;
+      for (const [rr, cc] of OUTER_CELLS) { if (cur[rr][cc] === want) { loc = [rr, cc]; break; } }
+      if (!loc) continue;
+      swaps.push([r, c, loc[0], loc[1]]);
+      [cur[r][c], cur[loc[0]][loc[1]]] = [cur[loc[0]][loc[1]], cur[r][c]];
+    }
+
+    setHintsUsed((n) => n + 1);
+    setSelected(null);
+    if (!swaps.length) { setSatisfiedSides(computeSatisfied(grid)); return; }
+
+    setSolving(true);
+    let t = 0;
+    const STEP = 320;
+    for (const [r1, c1, r2, c2] of swaps) { setTimeout(() => animateSwap(r1, c1, r2, c2), t); t += STEP; }
+    setTimeout(() => { setSatisfiedSides(computeSatisfied(cur)); setSolving(false); }, t + 160);
   }
 
   function getCellColors(r, c) {
@@ -500,31 +549,17 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
           How to play
         </button>
         {!solved && !revealed && (
-          <button onClick={useHint} disabled={hints.length >= MAX_HINTS}
+          <button onClick={useHint} disabled={hintsUsed >= MAX_HINTS || solving}
             style={{
               ...ghostBtn, padding: "4px 12px",
-              color: hints.length >= MAX_HINTS ? "#444" : "#cfa93a",
-              borderColor: hints.length >= MAX_HINTS ? "#222232" : "#3a3018",
-              cursor: hints.length >= MAX_HINTS ? "default" : "pointer",
+              color: hintsUsed >= MAX_HINTS ? "#444" : "#cfa93a",
+              borderColor: hintsUsed >= MAX_HINTS ? "#222232" : "#3a3018",
+              cursor: hintsUsed >= MAX_HINTS || solving ? "default" : "pointer",
             }}>
-            💡 Hint{hints.length < MAX_HINTS ? ` (${MAX_HINTS - hints.length})` : ""}
+            💡 Hint{hintsUsed < MAX_HINTS ? ` (${MAX_HINTS - hintsUsed})` : ""}
           </button>
         )}
       </div>
-
-      {hints.length > 0 && (
-        <div style={{
-          background: "#1a160a", border: "1px solid #3a3018", borderRadius: "12px",
-          padding: "10px 16px", maxWidth: "420px", width: "100%", marginBottom: "16px",
-          fontSize: "12.5px", color: "#cbb26a", lineHeight: 1.7,
-        }}>
-          {hints.map((cat) => (
-            <div key={cat}>
-              💡 <strong>{cat}:</strong> {puzzle.categoryWords[cat].join(", ")}
-            </div>
-          ))}
-        </div>
-      )}
 
       <div style={{ display: "flex", alignItems: "center", gap: "9px", marginBottom: "16px", minHeight: "16px" }}>
         <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "#555" }}>
