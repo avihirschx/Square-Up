@@ -4,8 +4,7 @@ import {
   CELL_SIDE, CELL, GAP,
 } from "../engine/geometry.js";
 import {
-  isLockedEdge, resolveSide, validateGrid, getCorrectSideMap,
-  dealPuzzle, shuffleKeepingLocked,
+  resolveSide, validateGrid, dealPuzzle, shuffleKeepingLocked,
 } from "../engine/engine.js";
 import { buildShareText, shareResult } from "../lib/share.js";
 
@@ -19,11 +18,14 @@ const NAG_MESSAGES = [
 ];
 
 export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBack }) {
-  const { colors, cornerWordColors, fallbackGrid } = puzzle;
+  const { colors, fallbackGrid } = puzzle;
 
   const [grid, setGrid]                     = useState(() => dealPuzzle(puzzle));
   const [selected, setSelected]             = useState(null);
-  const [correctSideMap, setCorrectSideMap] = useState(null);
+  // satisfiedSides: { side: category } — a side is "satisfied" when its 4 words
+  // (as a set, position-independent) match a category. Snapshot from the last
+  // check; tiles stay movable. Cleared on shuffle/reset.
+  const [satisfiedSides, setSatisfiedSides] = useState({});
   const [solvedSides, setSolvedSides]       = useState(null);
   const [solved, setSolved]                 = useState(false);
   const [shake, setShake]                   = useState(false);
@@ -38,7 +40,6 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
   const [solveAnim, setSolveAnim]           = useState(false);
   const [solving, setSolving]               = useState(false);
   const [justSaved, setJustSaved]           = useState(false);
-  const [confirmedCornerWords, setConfirmedCornerWords] = useState(new Set());
   const [shareMsg, setShareMsg]             = useState("");
   const pointerDrag = useRef(null);
   const nagTimer    = useRef(null);
@@ -50,10 +51,10 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
   const guesses     = wrongCount + (solved ? 1 : 0);
   const attemptsLeft = Math.max(0, MAX_ATTEMPTS - wrongCount);
   const isSaved     = saved || justSaved;
+  const satisfiedCount = Object.keys(satisfiedSides).length;
 
-  function animateSwap(r1, c1, r2, c2, fromDrag = false, releasePoint = null, force = false) {
+  function animateSwap(r1, c1, r2, c2, fromDrag = false, releasePoint = null) {
     const k1 = `${r1},${c1}`, k2 = `${r2},${c2}`;
-    if (!force && (isLockedEdge(k1, correctSideMap) || isLockedEdge(k2, correctSideMap))) return;
 
     const el1 = cellEls.current[k1];
     const el2 = cellEls.current[k2];
@@ -108,15 +109,16 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
   function handleCellTap(r, c) {
     if (solved || revealed || isAnimating || solving) return;
     const key = `${r},${c}`;
-    if (isLockedEdge(key, correctSideMap)) { setSelected(null); return; }
+    if (isFullyLocked(key)) { setSelected(null); return; }
     if (selected) {
-      if (isLockedEdge(`${selected.r},${selected.c}`, correctSideMap)) { setSelected(null); return; }
-      if (selected.r === r && selected.c === c) {
-        setSelected(null);
-      } else {
+      if (selected.r === r && selected.c === c) { setSelected(null); return; }
+      const selKey = `${selected.r},${selected.c}`;
+      if (canSwap(selKey, key)) {
         const { r: r1, c: c1 } = selected;
         setSelected(null);
         animateSwap(r1, c1, r, c);
+      } else {
+        setSelected({ r, c }); // not a legal partner — switch selection instead
       }
     } else {
       setSelected({ r, c });
@@ -125,7 +127,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
 
   function onPointerDown(e, r, c) {
     if (solved || revealed || isAnimating || solving) return;
-    if (isLockedEdge(`${r},${c}`, correctSideMap)) return;
+    if (isFullyLocked(`${r},${c}`)) return; // confirmed corners don't move
     e.currentTarget.setPointerCapture(e.pointerId);
     pointerDrag.current = {
       r, c, word: grid[r][c],
@@ -175,7 +177,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
 
     if (targetKey) {
       const [tr, tc] = targetKey.split(",").map(Number);
-      if (tr !== drag.r || tc !== drag.c) {
+      if ((tr !== drag.r || tc !== drag.c) && canSwap(`${drag.r},${drag.c}`, targetKey)) {
         animateSwap(drag.r, drag.c, tr, tc, true, { x: e.clientX, y: e.clientY });
       }
     }
@@ -186,6 +188,34 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
     setDragState(null);
   }
 
+  // Which sides are satisfied right now (4 words match a category set).
+  function computeSatisfied(g) {
+    const sat = {};
+    for (const side of Object.keys(SIDE_CELLS)) {
+      const cat = resolveSide(puzzle, g, side);
+      if (cat) sat[side] = cat;
+    }
+    return sat;
+  }
+
+  // Once a side is confirmed, its tiles bind to it: they may only be swapped
+  // with other cells of the same confirmed side (so corners can still be
+  // ordered), and a corner confirmed by BOTH its sides is fully locked.
+  function confirmedSidesOf(key) {
+    const sides = GRID_CORNERS.has(key) ? CORNER_SIDES[key] : [CELL_SIDE[key]];
+    return sides.filter((s) => satisfiedSides[s]);
+  }
+  function isFullyLocked(key) {
+    return confirmedSidesOf(key).length >= 2;
+  }
+  function canSwap(k1, k2) {
+    const a = confirmedSidesOf(k1);
+    const b = confirmedSidesOf(k2);
+    if (a.length >= 2 || b.length >= 2) return false;   // a confirmed corner is fixed
+    if (a.length === 0 && b.length === 0) return true;  // both free
+    return a.length === 1 && b.length === 1 && a[0] === b[0]; // same confirmed side
+  }
+
   // Auto-solve: slide every tile into its correct spot, one swap at a time,
   // then color the solved sides. Used when the player runs out of attempts.
   function autoSolve() {
@@ -193,7 +223,6 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
     if (!target) return;
     setSolving(true);
     setSelected(null);
-    setCorrectSideMap(null); // drop locks so any tile can move
 
     // Selection-sort the current board toward the solved board, recording the
     // position swaps needed.
@@ -215,7 +244,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
     const STEP = 360;
     let t = 250;
     for (const [r1, c1, r2, c2] of swaps) {
-      setTimeout(() => animateSwap(r1, c1, r2, c2, false, null, true), t);
+      setTimeout(() => animateSwap(r1, c1, r2, c2), t);
       t += STEP;
     }
     setTimeout(() => {
@@ -231,49 +260,34 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
   function checkSolution() {
     if (isAnimating || solving) return;
 
-    setConfirmedCornerWords((prev) => {
-      const next = new Set(prev);
-      for (const key of GRID_CORNERS) {
-        const [r, c] = key.split(",").map(Number);
-        const word = grid[r][c];
-        if (word && cornerWordColors[word]) next.add(word);
-      }
-      return next;
-    });
-
     const valid = validateGrid(puzzle, grid);
     if (valid) {
+      setSatisfiedSides(valid.sideCategories);
       setSolvedSides(valid.sideCategories);
       setSolved(true);
       setTimeout(() => setSolveAnim(true), 500);
+      return;
+    }
+
+    // Not solved: color whichever sides are full categories, count an attempt.
+    setSatisfiedSides(computeSatisfied(grid));
+    const newCount = wrongCount + 1;
+    setWrongCount(newCount);
+    setShake(true); setTimeout(() => setShake(false), 500);
+    clearTimeout(nagTimer.current);
+    setNagVisible(true);
+    if (newCount >= MAX_ATTEMPTS && canReveal) {
+      setSolving(true); // lock the board immediately so nothing desyncs the solve
+      setTimeout(() => { setNagVisible(false); autoSolve(); }, 1500);
     } else {
-      const csm = getCorrectSideMap(puzzle, grid);
-      setCorrectSideMap((prev) => {
-        const merged = new Map(prev ?? []);
-        for (const [side, cat] of csm) merged.set(side, cat);
-        return merged;
-      });
-      const newCount = wrongCount + 1;
-      setWrongCount(newCount);
-      setShake(true); setTimeout(() => setShake(false), 500);
-      clearTimeout(nagTimer.current);
-      setNagVisible(true);
-      if (newCount >= MAX_ATTEMPTS && canReveal) {
-        setSolving(true); // lock the board immediately so nothing desyncs the solve
-        setTimeout(() => { setNagVisible(false); autoSolve(); }, 1500);
-      } else {
-        nagTimer.current = setTimeout(() => setNagVisible(false), 3000);
-      }
+      nagTimer.current = setTimeout(() => setNagVisible(false), 3000);
     }
   }
 
   function shufflePuzzle() {
     if (solved || revealed || solving || isAnimating) return;
-    const lockedKeys = new Set();
-    for (const key of OUTER_CELLS.map(([r, c]) => `${r},${c}`)) {
-      if (isLockedEdge(key, correctSideMap)) lockedKeys.add(key);
-    }
-    setGrid((prev) => shuffleKeepingLocked(prev, lockedKeys));
+    setGrid((prev) => shuffleKeepingLocked(prev, new Set())); // shuffle all 12
+    setSatisfiedSides({}); // board moved — clear the stale coloring
     setSelected(null);
     setSwapAnim({}); setDragState(null);
     setShake(false);
@@ -285,7 +299,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
     setGrid(dealPuzzle(puzzle));
     setSelected(null);
     setSolved(false); setSolvedSides(null);
-    setCorrectSideMap(null); setConfirmedCornerWords(new Set());
+    setSatisfiedSides({});
     setWrongCount(0); setNagVisible(false); setShake(false);
     setRevealed(false); setRevealedSides(null); setRevealAnim(false);
     setSwapAnim({}); setDragState(null); setSolveAnim(false);
@@ -302,47 +316,54 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
     setTimeout(() => setShareMsg(""), 2200);
   }
 
-  function getCellColors(r, c, word) {
+  function getCellColors(r, c) {
     const key = `${r},${c}`;
     const isCorner = GRID_CORNERS.has(key);
     const delay = OUTER_CELLS.findIndex(([or, oc]) => or === r && oc === c) * 55;
 
+    // Full reveal (solved / answer shown): color every side.
     if (activeSides) {
       const entering = revealed && !revealAnim;
       if (isCorner) {
         const [bg1, bg2] = CORNER_SIDES[key].map((side) => colors[activeSides[side]].bg);
-        return { bg1, bg2, textColor: "#fff", isCornerSplit: true, isLockedEdgeCell: false, entering, delay };
+        return { bg1, bg2, textColor: "#fff", isCornerSplit: true, entering, delay };
       }
       const side = CELL_SIDE[key];
-      return { bg1: colors[activeSides[side]].bg, textColor: "#fff", isCornerSplit: false, isLockedEdgeCell: false, entering, delay };
+      return { bg1: colors[activeSides[side]].bg, bg2: null, textColor: "#fff", isCornerSplit: false, entering, delay };
     }
 
-    if (word && confirmedCornerWords.has(word)) {
-      const { bg1, bg2 } = cornerWordColors[word];
-      return { bg1, bg2, textColor: "#fff", isCornerSplit: true, isLockedEdgeCell: false, entering: false, delay };
-    }
-
-    if (!isCorner && correctSideMap?.size > 0) {
-      const side = CELL_SIDE[key];
-      if (correctSideMap.has(side)) {
-        const cat = correctSideMap.get(side);
-        return {
-          bg1: colors[cat].bg, bg2: null, textColor: colors[cat].text,
-          isCornerSplit: false, isLockedEdgeCell: true, entering: false, delay,
-        };
+    // In progress: color satisfied sides from the last check.
+    if (isCorner) {
+      const [sa, sb] = CORNER_SIDES[key];
+      const ca = satisfiedSides[sa];
+      const cb = satisfiedSides[sb];
+      if (ca && cb) {
+        // Both adjacent sides satisfied → confirmed corner, two colors.
+        return { bg1: colors[ca].bg, bg2: colors[cb].bg, textColor: "#fff", isCornerSplit: true, entering: false, delay };
+      }
+      const one = ca || cb;
+      if (one) {
+        return { bg1: colors[one].bg, bg2: null, textColor: colors[one].text, isCornerSplit: false, entering: false, delay };
+      }
+    } else {
+      const cat = satisfiedSides[CELL_SIDE[key]];
+      if (cat) {
+        return { bg1: colors[cat].bg, bg2: null, textColor: colors[cat].text, isCornerSplit: false, entering: false, delay };
       }
     }
 
-    return {
-      bg1: "#2a2a3c", bg2: null, textColor: "#f0f0f0",
-      isCornerSplit: false, isLockedEdgeCell: false, entering: false, delay,
-    };
+    return { bg1: "#2a2a3c", bg2: null, textColor: "#f0f0f0", isCornerSplit: false, entering: false, delay };
   }
 
   function sideLabelColor(side) {
     if (activeSides) return colors[activeSides[side]].bg;
-    if (correctSideMap?.has(side)) return colors[correctSideMap.get(side)].bg;
+    if (satisfiedSides[side]) return colors[satisfiedSides[side]].bg;
     return "#333";
+  }
+
+  function sideLabelText(side) {
+    if (activeSides) return activeSides[side];
+    return satisfiedSides[side] || "";
   }
 
   const ghostBtn = {
@@ -354,6 +375,15 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
     width: "70px", height: "30px", borderRadius: "8px",
     background: "#15151f", color: "#8a8a9a", fontWeight: 600, fontSize: "12px",
     border: "1px solid #2a2a3a", transition: "opacity 0.15s",
+  };
+
+  const sqShare = {
+    padding: "7px 16px", borderRadius: "8px", background: "#2A7AE4", color: "#fff",
+    fontWeight: 800, fontSize: "12px", border: "none", cursor: "pointer",
+  };
+  const sqMenu = {
+    padding: "7px 16px", borderRadius: "8px", background: "#15151f", color: "#bbb",
+    fontWeight: 700, fontSize: "12px", border: "1px solid #2a2a3a", cursor: "pointer",
   };
 
   const sideLabel = (side) => ({
@@ -412,11 +442,11 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
         }}>
           <p style={{ margin: "0 0 8px", fontWeight: 700, color: "#ddd", fontSize: "14px" }}>How to play</p>
           <ul style={{ margin: 0, paddingLeft: "18px" }}>
-            <li>All 12 words are on the board — swap them into the right positions</li>
-            <li><strong>Tap</strong> a word then <strong>tap</strong> another to swap</li>
-            <li>Or <strong>slide</strong> a word onto another to swap</li>
-            <li>Each side must form a category · corner words belong to both adjacent sides</li>
-            <li>Tap the green <strong>✓</strong> in the center when you're ready</li>
+            <li>All 12 words are on the board — swap them into place</li>
+            <li><strong>Tap</strong> two words to swap, or <strong>slide</strong> one onto another</li>
+            <li>A side lights up when its four words all belong to one category (any order)</li>
+            <li>A corner shows <strong>two colors</strong> once both of its sides are right</li>
+            <li>Hit the <strong>✓</strong> to check — you get 4 tries</li>
           </ul>
         </div>
       )}
@@ -440,10 +470,28 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
         </span>
       </div>
 
-      <div style={{ width: `${4 * CELL + 3 * GAP}px`, textAlign: "center", marginBottom: "5px", minHeight: "20px" }}>
-        <span style={sideLabel("top")}>
-          {activeSides ? activeSides.top : (correctSideMap?.has("top") ? correctSideMap.get("top") : "")}
+      <div style={{ display: "flex", alignItems: "center", gap: "9px", marginBottom: "18px", minHeight: "16px" }}>
+        <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "#555" }}>
+          Sides
         </span>
+        <div style={{ display: "flex", gap: "5px" }}>
+          {["top", "right", "bottom", "left"].map((side) => (
+            <span key={side} style={{
+              width: "12px", height: "12px", borderRadius: "3px",
+              background: activeSides
+                ? colors[activeSides[side]].bg
+                : satisfiedSides[side] ? colors[satisfiedSides[side]].bg : "#2e2e3e",
+              transition: "background 0.3s",
+            }} />
+          ))}
+        </div>
+        <span style={{ fontSize: "11px", fontWeight: 700, color: "#888" }}>
+          {(activeSides ? 4 : satisfiedCount)}/4
+        </span>
+      </div>
+
+      <div style={{ width: `${4 * CELL + 3 * GAP}px`, textAlign: "center", marginBottom: "5px", minHeight: "20px" }}>
+        <span style={sideLabel("top")}>{sideLabelText("top")}</span>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -452,7 +500,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
           writingMode: "vertical-rl", transform: "rotate(180deg)",
           width: "22px", textAlign: "center",
         }}>
-          {activeSides ? activeSides.left : (correctSideMap?.has("left") ? correctSideMap.get("left") : "")}
+          {sideLabelText("left")}
         </div>
 
         <div style={{
@@ -474,9 +522,29 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
                       alignItems: "center", justifyContent: "center", gap: "9px",
                     }}>
                       {solved ? (
-                        <span style={{ fontSize: "38px" }}>🎉</span>
+                        <div style={{
+                          display: "flex", flexDirection: "column", alignItems: "center", gap: "5px",
+                          animation: "victory-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both",
+                        }}>
+                          <div style={{ fontSize: "26px", lineHeight: 1 }}>🎉</div>
+                          <div style={{ fontSize: "15px", fontWeight: 800, color: "#fff", letterSpacing: "-0.3px" }}>Squared up!</div>
+                          <div style={{ fontSize: "10px", color: "#6f9f78", fontWeight: 600 }}>
+                            {guesses === 1 ? "First try!" : `Solved in ${guesses}`}
+                          </div>
+                          <div style={{ display: "flex", gap: "7px", marginTop: "3px" }}>
+                            <button onClick={onShare} style={sqShare}>Share</button>
+                            <button onClick={onBack} style={sqMenu}>Menu</button>
+                          </div>
+                        </div>
                       ) : revealed ? (
-                        <span style={{ fontSize: "34px" }}>😤</span>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+                          <div style={{ fontSize: "26px", lineHeight: 1 }}>😤</div>
+                          <div style={{ fontSize: "13px", fontWeight: 800, color: "#dd6a6a" }}>Answer shown</div>
+                          <div style={{ display: "flex", gap: "7px", marginTop: "3px" }}>
+                            <button onClick={onShare} style={sqShare}>Share</button>
+                            <button onClick={onBack} style={sqMenu}>Menu</button>
+                          </div>
+                        </div>
                       ) : (
                         <>
                           <button
@@ -518,9 +586,9 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
               const word = grid[r][c];
               const isSel = selected?.r === r && selected?.c === c;
               const anim = swapAnim[key];
-              const { bg1, bg2, textColor, isCornerSplit, isLockedEdgeCell, entering, delay } = getCellColors(r, c, word);
+              const { bg1, bg2, textColor, isCornerSplit, entering, delay } = getCellColors(r, c);
               const isDraggingThis = dragState && pointerDrag.current?.r === r && pointerDrag.current?.c === c;
-              const locked = isLockedEdgeCell && !activeSides;
+              const fullyLocked = isFullyLocked(key);
 
               return (
                 <div
@@ -535,7 +603,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
                     borderRadius: "10px", overflow: "hidden",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: "13px", fontWeight: 700, textAlign: "center",
-                    cursor: solved || revealed ? "default" : locked ? "not-allowed" : "pointer",
+                    cursor: solved || revealed || fullyLocked ? "default" : "pointer",
                     userSelect: "none", padding: "4px", wordBreak: "break-word", lineHeight: "1.2",
                     position: "relative", touchAction: "none",
                     background: isCornerSplit ? "transparent" : bg1,
@@ -547,7 +615,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
                     transform: anim
                       ? `translate(${anim.tx}px, ${anim.ty}px)`
                       : entering ? "scale(0.5)" : isSel ? "scale(1.05)" : "scale(1)",
-                    opacity: entering ? 0 : isDraggingThis ? 0.25 : locked ? 0.55 : (anim?.opacity ?? 1),
+                    opacity: entering ? 0 : isDraggingThis ? 0.25 : (anim?.opacity ?? 1),
                     transition: entering
                       ? `transform 0.4s ease ${delay}ms, opacity 0.4s ease ${delay}ms`
                       : anim?.transition
@@ -583,31 +651,13 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
           ...sideLabel("right"),
           writingMode: "vertical-rl", width: "22px", textAlign: "center",
         }}>
-          {activeSides ? activeSides.right : (correctSideMap?.has("right") ? correctSideMap.get("right") : "")}
+          {sideLabelText("right")}
         </div>
       </div>
 
       <div style={{ width: `${4 * CELL + 3 * GAP}px`, textAlign: "center", marginTop: "5px", marginBottom: "18px", minHeight: "20px" }}>
-        <span style={sideLabel("bottom")}>
-          {activeSides ? activeSides.bottom : (correctSideMap?.has("bottom") ? correctSideMap.get("bottom") : "")}
-        </span>
+        <span style={sideLabel("bottom")}>{sideLabelText("bottom")}</span>
       </div>
-
-      {solveAnim && (
-        <div style={{
-          marginBottom: "18px",
-          animation: "victory-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both",
-          textAlign: "center",
-        }}>
-          <div style={{ fontSize: "36px", marginBottom: "4px" }}>🎉</div>
-          <div style={{ fontSize: "22px", fontWeight: 800, color: "#fff", letterSpacing: "-0.5px" }}>
-            Squared up!
-          </div>
-          <div style={{ fontSize: "13px", color: "#666", marginTop: "4px" }}>
-            {guesses === 1 ? "First try — flawless." : `Solved in ${guesses} guesses.`}
-          </div>
-        </div>
-      )}
 
       <div style={{
         maxWidth: "400px", width: "100%", overflow: "hidden",
@@ -637,33 +687,26 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
         )}
       </div>
 
-      {correctSideMap?.size > 0 && !solved && !revealed && !nagVisible && (
+      {satisfiedCount > 0 && !solved && !revealed && !nagVisible && (
         <div style={{
           marginBottom: "14px", padding: "10px 20px",
           background: "#0d1a0d", border: "1px solid #1a3a1a",
           borderRadius: "10px", textAlign: "center", color: "#aaa", fontSize: "13px", fontWeight: 600,
         }}>
-          {correctSideMap.size === 1
-            ? "1 side correct — keep swapping!"
-            : `${correctSideMap.size} sides correct — keep swapping!`}
+          {satisfiedCount === 1
+            ? "1 side is a category — now line up the corners!"
+            : `${satisfiedCount} sides are categories — now line up the corners!`}
         </div>
       )}
 
-      {(solved || revealed) && (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", marginTop: "4px" }}>
-          <div style={{ display: "flex", gap: "10px" }}>
-            <button onClick={onShare} style={{
-              padding: "11px 26px", borderRadius: "10px",
-              background: "#2A7AE4", color: "#fff", fontWeight: 800, fontSize: "14px",
-              border: "none", cursor: "pointer", boxShadow: "0 4px 16px rgba(42,122,228,0.35)",
-            }}>Share result</button>
-            <button onClick={onBack} style={{
-              padding: "11px 26px", borderRadius: "10px",
-              background: "#131320", color: "#aaa", fontWeight: 700, fontSize: "14px",
-              border: "1px solid #222232", cursor: "pointer",
-            }}>Menu</button>
-          </div>
-          <div style={{ height: "16px", fontSize: "12px", color: "#5CC877", fontWeight: 700 }}>{shareMsg}</div>
+      {shareMsg && (
+        <div style={{
+          position: "fixed", bottom: "26px", left: "50%", transform: "translateX(-50%)",
+          background: "#131320", border: "1px solid #2a4a2a", color: "#5CC877",
+          fontWeight: 700, fontSize: "13px", padding: "9px 18px", borderRadius: "10px",
+          zIndex: 1100, boxShadow: "0 6px 20px rgba(0,0,0,0.5)",
+        }}>
+          {shareMsg}
         </div>
       )}
 
