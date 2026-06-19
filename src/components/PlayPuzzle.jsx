@@ -22,6 +22,23 @@ const CORNER_GRAD = {
   "3,3": (col) => `linear-gradient(45deg, ${col.bottom} 50%, ${col.right} 50%)`,
 };
 
+// Center checker: one triangle per side (base toward its side), with an arrow
+// pointing at the side it checks.
+const SIDE_LIST = ["top", "right", "bottom", "left"];
+const SIDE_CLIP = {
+  top:    "polygon(0% 0%, 100% 0%, 50% 50%)",
+  right:  "polygon(100% 0%, 100% 100%, 50% 50%)",
+  bottom: "polygon(100% 100%, 0% 100%, 50% 50%)",
+  left:   "polygon(0% 100%, 0% 0%, 50% 50%)",
+};
+const SIDE_ARROW = { top: "▲", right: "▶", bottom: "▼", left: "◀" };
+const SIDE_ARROW_POS = {
+  top:    { top: "6px", left: "50%", transform: "translateX(-50%)" },
+  right:  { right: "6px", top: "50%", transform: "translateY(-50%)" },
+  bottom: { bottom: "6px", left: "50%", transform: "translateX(-50%)" },
+  left:   { left: "6px", top: "50%", transform: "translateY(-50%)" },
+};
+
 function shuffleArr(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -64,6 +81,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
   const [dragState, setDragState]           = useState(null);
   const [solveAnim, setSolveAnim]           = useState(false);
   const [solving, setSolving]               = useState(false);
+  const [flashSide, setFlashSide]           = useState(null); // side flashing red on a wrong check
   const [justSaved, setJustSaved]           = useState(false);
   const [shareMsg, setShareMsg]             = useState("");
   const pointerDrag = useRef(null);
@@ -306,26 +324,31 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
     }, t + 150);
   }
 
-  function checkSolution() {
-    if (isAnimating || solving) return;
+  // Check ONE side. Correct → confirm it (no life cost, button greys out).
+  // Wrong → costs a life. All four confirmed → solved.
+  function checkSide(side) {
+    if (solved || revealed || solving || isAnimating) return;
+    if (satisfiedSides[side]) return; // already confirmed
+    const cat = resolveSide(puzzle, grid, side);
 
-    const valid = validateGrid(puzzle, grid);
-    if (valid) {
-      setSatisfiedSides(valid.sideCategories);
-      setSolvedSides(valid.sideCategories);
-      setHistory((h) => [...h, [true, true, true, true]]);
-      setSolved(true);
-      setTimeout(() => setSolveAnim(true), 500);
-      return;
+    if (cat) {
+      const next = { ...satisfiedSides, [side]: cat };
+      setSatisfiedSides(next);
+      setHistory((h) => [...h, ["top", "right", "bottom", "left"].map((s) => !!next[s])]);
+      if (Object.keys(next).length === 4) {
+        setSolvedSides(next);
+        setSolved(true);
+        setTimeout(() => setSolveAnim(true), 500);
+      }
+      return; // correct → no life lost
     }
 
-    // Not solved: color whichever sides are full categories, count an attempt.
-    const sat = computeSatisfied(grid);
-    setSatisfiedSides(sat);
-    setHistory((h) => [...h, ["top", "right", "bottom", "left"].map((s) => !!sat[s])]);
+    // Wrong → costs a life.
+    setFlashSide(side);
+    setTimeout(() => setFlashSide(null), 450);
+    setShake(true); setTimeout(() => setShake(false), 500);
     const newCount = wrongCount + 1;
     setWrongCount(newCount);
-    setShake(true); setTimeout(() => setShake(false), 500);
     clearTimeout(nagTimer.current);
     setNagVisible(true);
     if (newCount >= MAX_ATTEMPTS && canReveal) {
@@ -387,7 +410,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
 
   async function onShare() {
     const url = source ? buildShareUrl(source) : undefined;
-    const text = buildShareText({ name, revealed, history, url });
+    const text = buildShareText({ name, revealed, history, url, livesLeft: attemptsLeft });
     const r = await shareResult(text);
     setShareMsg(r === "failed" ? "Couldn't copy" : r === "shared" ? "Shared!" : "Copied!");
     setTimeout(() => setShareMsg(""), 2200);
@@ -548,7 +571,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
 
       <div style={{ display: "flex", alignItems: "center", gap: "9px", marginBottom: "16px", minHeight: "16px" }}>
         <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "#555" }}>
-          Attempts
+          Lives
         </span>
         <div style={{ display: "flex", gap: "5px" }}>
           {Array.from({ length: MAX_ATTEMPTS }).map((_, i) => (
@@ -621,12 +644,10 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
             Array.from({ length: 4 }, (_, c) => {
               if (INNER_CELLS.has(`${r},${c}`)) {
                 if (r === 1 && c === 1) {
-                  const clickable = !solved && !revealed && !solving;
                   return (
                     <div key="center" style={{
                       gridColumn: "2/4", gridRow: "2/4",
-                      display: "flex", flexDirection: "column",
-                      alignItems: "center", justifyContent: "center", gap: "9px",
+                      display: "flex", alignItems: "center", justifyContent: "center",
                     }}>
                       {solved ? (
                         <div style={{
@@ -636,7 +657,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
                           <div style={{ fontSize: "26px", lineHeight: 1 }}>🎉</div>
                           <div style={{ fontSize: "15px", fontWeight: 800, color: "#fff", letterSpacing: "-0.3px" }}>Squared up!</div>
                           <div style={{ fontSize: "10px", color: "#6f9f78", fontWeight: 600 }}>
-                            {guesses === 1 ? "First try!" : `Solved in ${guesses}`}
+                            {wrongCount === 0 ? "No mistakes!" : `${wrongCount} miss${wrongCount === 1 ? "" : "es"}`}
                           </div>
                           <div style={{ display: "flex", gap: "7px", marginTop: "3px" }}>
                             <button onClick={onShare} style={sqShare}>Share</button>
@@ -653,35 +674,47 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
                           </div>
                         </div>
                       ) : (
-                        <>
-                          <button
-                            aria-label="Check"
-                            onClick={clickable ? checkSolution : undefined}
-                            style={{
-                              width: "150px", height: "42px", borderRadius: "10px", padding: 0,
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              background: "#1d3326", border: "1px solid #2f5d3b",
-                              color: "#6cc585",
-                              cursor: clickable ? "pointer" : "default",
-                              opacity: clickable ? 1 : 0.5,
-                              transition: "background 0.15s, border-color 0.15s, opacity 0.15s",
-                            }}>
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
-                              stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="5 12.5 10 17.5 19 7" />
-                            </svg>
-                          </button>
-                          <div style={{ display: "flex", gap: "8px" }}>
-                            <button onClick={shufflePuzzle} disabled={solving}
-                              style={{ ...centerCtrl, cursor: solving ? "default" : "pointer", opacity: solving ? 0.4 : 1 }}>
-                              Shuffle
-                            </button>
-                            <button onClick={resetPuzzle} disabled={solving}
-                              style={{ ...centerCtrl, cursor: solving ? "default" : "pointer", opacity: solving ? 0.4 : 1 }}>
-                              Reset
-                            </button>
-                          </div>
-                        </>
+                        <div style={{
+                          position: "relative", width: "124px", height: "124px",
+                          borderRadius: "12px", overflow: "hidden", background: "#0d0d12",
+                        }}>
+                          {SIDE_LIST.map((s) => {
+                            const done = !!satisfiedSides[s];
+                            const flashing = flashSide === s;
+                            const dis = done || solving;
+                            return (
+                              <button key={s} aria-label={`Check ${s} side`}
+                                onClick={() => checkSide(s)} disabled={dis}
+                                style={{
+                                  position: "absolute", inset: 0, border: "none", padding: 0,
+                                  clipPath: SIDE_CLIP[s],
+                                  background: done ? colors[satisfiedSides[s]].bg : flashing ? "#8a2020" : "#1d3326",
+                                  color: "#fff",
+                                  cursor: dis ? "default" : "pointer",
+                                  transition: "background 0.2s",
+                                }}>
+                                <span style={{
+                                  position: "absolute", ...SIDE_ARROW_POS[s],
+                                  display: "flex", flexDirection: "column", alignItems: "center", gap: "0px",
+                                  fontWeight: 800, lineHeight: 1, pointerEvents: "none",
+                                  color: done ? "#fff" : "#7fcf95",
+                                }}>
+                                  {done ? (
+                                    <span style={{ fontSize: "15px" }}>✓</span>
+                                  ) : (
+                                    <>
+                                      <span style={{ fontSize: "11px" }}>{SIDE_ARROW[s]}</span>
+                                      <span style={{ fontSize: "9px", opacity: 0.85 }}>✓</span>
+                                    </>
+                                  )}
+                                </span>
+                              </button>
+                            );
+                          })}
+                          {/* thin dark diagonals to separate the four triangles */}
+                          <div style={{ position: "absolute", left: "-21%", top: "calc(50% - 1px)", width: "142%", height: "2px", background: "#0d0d12", transform: "rotate(45deg)", pointerEvents: "none" }} />
+                          <div style={{ position: "absolute", left: "-21%", top: "calc(50% - 1px)", width: "142%", height: "2px", background: "#0d0d12", transform: "rotate(-45deg)", pointerEvents: "none" }} />
+                        </div>
                       )}
                     </div>
                   );
@@ -767,6 +800,21 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
       </div>
       </div>
 
+      {!solved && !revealed && (
+        <div style={{ display: "flex", gap: "10px", marginBottom: "16px" }}>
+          <button onClick={shufflePuzzle} disabled={solving} style={{
+            padding: "9px 24px", borderRadius: "10px",
+            background: "#131320", color: "#888", fontWeight: 600, fontSize: "14px",
+            border: "1px solid #222232", cursor: solving ? "default" : "pointer", opacity: solving ? 0.4 : 1,
+          }}>Shuffle</button>
+          <button onClick={resetPuzzle} disabled={solving} style={{
+            padding: "9px 24px", borderRadius: "10px",
+            background: "#131320", color: "#888", fontWeight: 600, fontSize: "14px",
+            border: "1px solid #222232", cursor: solving ? "default" : "pointer", opacity: solving ? 0.4 : 1,
+          }}>Reset</button>
+        </div>
+      )}
+
       <div style={{
         maxWidth: "400px", width: "100%", overflow: "hidden",
         maxHeight: nagVisible ? "90px" : "0",
@@ -801,9 +849,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
           background: "#0d1a0d", border: "1px solid #1a3a1a",
           borderRadius: "10px", textAlign: "center", color: "#aaa", fontSize: "13px", fontWeight: 600,
         }}>
-          {satisfiedCount === 1
-            ? "1 side is a category — now line up the corners!"
-            : `${satisfiedCount} sides are categories — now line up the corners!`}
+          {`${satisfiedCount} of 4 sides solved — ${4 - satisfiedCount} to go!`}
         </div>
       )}
 

@@ -14,7 +14,7 @@ function gridFromHistory(history) {
     .join("\n");
 }
 
-export function buildShareText({ name, dayNumber, revealed, history, url }) {
+export function buildShareText({ name, dayNumber, revealed, history, url, livesLeft }) {
   const heading =
     dayNumber != null ? `Square Up #${dayNumber}` : name ? `Square Up — ${name}` : "Square Up";
 
@@ -22,6 +22,8 @@ export function buildShareText({ name, dayNumber, revealed, history, url }) {
   const grid = gridFromHistory(history);
   const result = revealed
     ? "Gave up 🏳️"
+    : livesLeft != null
+    ? `Solved · ${livesLeft}/4 ❤️`
     : `Solved in ${tries}/4 ✅`;
 
   // Prefer the puzzle's own share link (carries the whole puzzle) so the
