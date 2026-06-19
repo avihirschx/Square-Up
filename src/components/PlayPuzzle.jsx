@@ -460,6 +460,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
               if (INNER_CELLS.has(`${r},${c}`)) {
                 if (r === 1 && c === 1) {
                   const clickable = !solved && !revealed && !solving;
+                  const SQ = 96;
                   return (
                     <div key="center" style={{
                       gridColumn: "2/4", gridRow: "2/4",
@@ -469,17 +470,27 @@ export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBa
                         aria-label={solved ? "Solved" : revealed ? "Answer" : "Check"}
                         onClick={clickable ? checkSolution : undefined}
                         style={{
-                          width: "58px", height: "58px", borderRadius: "50%", padding: 0,
+                          width: `${SQ}px`, height: `${SQ}px`, borderRadius: "14px", padding: 0,
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: "27px", lineHeight: 1,
-                          background: solved ? "#123018" : revealed ? "#2a0e0e" : "#1f9d40",
-                          border: solved ? "2px solid #2a5a32" : revealed ? "2px solid #5a1a1a" : "none",
+                          background: solved ? "#16351c" : revealed ? "#3a1414" : "#2EA84E",
+                          border: solved ? "1px solid #2f6b3a" : revealed ? "1px solid #6b2020" : "none",
                           color: "#fff",
                           cursor: clickable ? "pointer" : "default",
-                          boxShadow: clickable ? "0 4px 14px rgba(31,157,64,0.5)" : "none",
-                          transition: "all 0.2s",
+                          boxShadow: clickable
+                            ? "0 8px 22px rgba(46,168,78,0.45), inset 0 1px 0 rgba(255,255,255,0.25)"
+                            : "none",
+                          transition: "transform 0.12s ease, box-shadow 0.2s, background 0.2s",
                         }}>
-                        {solved ? "🎉" : revealed ? "😤" : "✓"}
+                        {solved ? (
+                          <span style={{ fontSize: "40px" }}>🎉</span>
+                        ) : revealed ? (
+                          <span style={{ fontSize: "36px" }}>😤</span>
+                        ) : (
+                          <svg width="50" height="50" viewBox="0 0 24 24" fill="none"
+                            stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="5 12.5 10 17.5 19 7" />
+                          </svg>
+                        )}
                       </button>
                     </div>
                   );
