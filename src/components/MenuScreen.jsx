@@ -1,8 +1,6 @@
-import { dailyPuzzle, formatPuzzleDate } from "../data/collection.js";
 import { countSaved } from "../lib/storage.js";
 
-export default function MenuScreen({ onPlayDaily, onMyPuzzles, onBuild }) {
-  const daily = dailyPuzzle();
+export default function MenuScreen({ onMyPuzzles, onBuild }) {
   const saved = countSaved();
 
   return (
@@ -30,22 +28,11 @@ export default function MenuScreen({ onPlayDaily, onMyPuzzles, onBuild }) {
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "14px", width: "100%", maxWidth: "300px" }}>
-        <button onClick={() => onPlayDaily(daily)} style={{
+        <button onClick={onBuild} style={{
           padding: "16px", borderRadius: "14px",
           background: "#2A7AE4", color: "#fff", fontWeight: 800, fontSize: "17px",
           border: "none", cursor: "pointer", boxShadow: "0 6px 20px rgba(42,122,228,0.35)",
-          display: "flex", flexDirection: "column", gap: "2px",
-        }}>
-          <span>Play today's puzzle</span>
-          <span style={{ fontSize: "12px", fontWeight: 600, opacity: 0.8 }}>
-            #{daily.dayNumber} · {formatPuzzleDate()}
-          </span>
-        </button>
-        <button onClick={onBuild} style={{
-          padding: "16px", borderRadius: "14px",
-          background: "#16161f", color: "#ddd", fontWeight: 800, fontSize: "17px",
-          border: "1px solid #2c2c40", cursor: "pointer",
-        }}>Build your own</button>
+        }}>Build a puzzle</button>
         <button onClick={onMyPuzzles} style={{
           padding: "16px", borderRadius: "14px",
           background: "#16161f", color: "#ddd", fontWeight: 800, fontSize: "17px",

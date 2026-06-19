@@ -9,13 +9,16 @@ import {
 } from "../engine/engine.js";
 import { buildShareText, shareResult } from "../lib/share.js";
 
+const MAX_ATTEMPTS = 4;
+
 const NAG_MESSAGES = [
   { emoji: "😬", text: "Not quite",         sub: "That's not right..." },
   { emoji: "🤔", text: "Still off",         sub: "Keep trying!" },
-  { emoji: "💡", text: "Here's the answer", sub: "Have a look." },
+  { emoji: "💡", text: "Last try!",         sub: "One attempt left." },
+  { emoji: "🏳️", text: "Out of attempts",  sub: "Solving it for you..." },
 ];
 
-export default function PlayPuzzle({ puzzle, title, subtitle, name, dayNumber, canSave, justSaved, onSave, onBack }) {
+export default function PlayPuzzle({ puzzle, subtitle, name, saved, onSave, onBack }) {
   const { colors, cornerWordColors, fallbackGrid } = puzzle;
 
   const [grid, setGrid]                     = useState(() => dealPuzzle(puzzle));
@@ -33,6 +36,8 @@ export default function PlayPuzzle({ puzzle, title, subtitle, name, dayNumber, c
   const [swapAnim, setSwapAnim]             = useState({});
   const [dragState, setDragState]           = useState(null);
   const [solveAnim, setSolveAnim]           = useState(false);
+  const [solving, setSolving]               = useState(false);
+  const [justSaved, setJustSaved]           = useState(false);
   const [confirmedCornerWords, setConfirmedCornerWords] = useState(new Set());
   const [shareMsg, setShareMsg]             = useState("");
   const pointerDrag = useRef(null);
@@ -43,10 +48,12 @@ export default function PlayPuzzle({ puzzle, title, subtitle, name, dayNumber, c
   const isAnimating = Object.keys(swapAnim).length > 0;
   const canReveal   = !!fallbackGrid;
   const guesses     = wrongCount + (solved ? 1 : 0);
+  const attemptsLeft = Math.max(0, MAX_ATTEMPTS - wrongCount);
+  const isSaved     = saved || justSaved;
 
-  function animateSwap(r1, c1, r2, c2, fromDrag = false, releasePoint = null) {
+  function animateSwap(r1, c1, r2, c2, fromDrag = false, releasePoint = null, force = false) {
     const k1 = `${r1},${c1}`, k2 = `${r2},${c2}`;
-    if (isLockedEdge(k1, correctSideMap) || isLockedEdge(k2, correctSideMap)) return;
+    if (!force && (isLockedEdge(k1, correctSideMap) || isLockedEdge(k2, correctSideMap))) return;
 
     const el1 = cellEls.current[k1];
     const el2 = cellEls.current[k2];
@@ -99,7 +106,7 @@ export default function PlayPuzzle({ puzzle, title, subtitle, name, dayNumber, c
   }
 
   function handleCellTap(r, c) {
-    if (solved || revealed || isAnimating) return;
+    if (solved || revealed || isAnimating || solving) return;
     const key = `${r},${c}`;
     if (isLockedEdge(key, correctSideMap)) { setSelected(null); return; }
     if (selected) {
@@ -117,7 +124,7 @@ export default function PlayPuzzle({ puzzle, title, subtitle, name, dayNumber, c
   }
 
   function onPointerDown(e, r, c) {
-    if (solved || revealed || isAnimating) return;
+    if (solved || revealed || isAnimating || solving) return;
     if (isLockedEdge(`${r},${c}`, correctSideMap)) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     pointerDrag.current = {
@@ -179,8 +186,50 @@ export default function PlayPuzzle({ puzzle, title, subtitle, name, dayNumber, c
     setDragState(null);
   }
 
+  // Auto-solve: slide every tile into its correct spot, one swap at a time,
+  // then color the solved sides. Used when the player runs out of attempts.
+  function autoSolve() {
+    const target = fallbackGrid;
+    if (!target) return;
+    setSolving(true);
+    setSelected(null);
+    setCorrectSideMap(null); // drop locks so any tile can move
+
+    // Selection-sort the current board toward the solved board, recording the
+    // position swaps needed.
+    const cur = grid.map((r) => [...r]);
+    const swaps = [];
+    for (let i = 0; i < OUTER_CELLS.length; i++) {
+      const [r, c] = OUTER_CELLS[i];
+      if (cur[r][c] === target[r][c]) continue;
+      for (let j = i + 1; j < OUTER_CELLS.length; j++) {
+        const [r2, c2] = OUTER_CELLS[j];
+        if (cur[r2][c2] === target[r][c]) {
+          swaps.push([r, c, r2, c2]);
+          [cur[r][c], cur[r2][c2]] = [cur[r2][c2], cur[r][c]];
+          break;
+        }
+      }
+    }
+
+    const STEP = 360;
+    let t = 250;
+    for (const [r1, c1, r2, c2] of swaps) {
+      setTimeout(() => animateSwap(r1, c1, r2, c2, false, null, true), t);
+      t += STEP;
+    }
+    setTimeout(() => {
+      const revSides = {};
+      for (const side of Object.keys(SIDE_CELLS)) revSides[side] = resolveSide(puzzle, target, side);
+      setRevealedSides(revSides);
+      setRevealAnim(true); // tiles are already in place — skip the scale-in pop
+      setRevealed(true);
+      setSolving(false);
+    }, t + 150);
+  }
+
   function checkSolution() {
-    if (isAnimating) return;
+    if (isAnimating || solving) return;
 
     setConfirmedCornerWords((prev) => {
       const next = new Set(prev);
@@ -209,17 +258,9 @@ export default function PlayPuzzle({ puzzle, title, subtitle, name, dayNumber, c
       setShake(true); setTimeout(() => setShake(false), 500);
       clearTimeout(nagTimer.current);
       setNagVisible(true);
-      if (newCount >= 3 && canReveal) {
-        setTimeout(() => {
-          setNagVisible(false);
-          const fb = fallbackGrid;
-          setGrid(fb);
-          const revSides = {};
-          for (const side of Object.keys(SIDE_CELLS)) revSides[side] = resolveSide(puzzle, fb, side);
-          setRevealedSides(revSides);
-          setRevealed(true);
-          setTimeout(() => setRevealAnim(true), 50);
-        }, 1800);
+      if (newCount >= MAX_ATTEMPTS && canReveal) {
+        setSolving(true); // lock the board immediately so nothing desyncs the solve
+        setTimeout(() => { setNagVisible(false); autoSolve(); }, 1500);
       } else {
         nagTimer.current = setTimeout(() => setNagVisible(false), 3000);
       }
@@ -227,7 +268,7 @@ export default function PlayPuzzle({ puzzle, title, subtitle, name, dayNumber, c
   }
 
   function shufflePuzzle() {
-    if (solved) return;
+    if (solved || revealed || solving || isAnimating) return;
     const lockedKeys = new Set();
     for (const key of OUTER_CELLS.map(([r, c]) => `${r},${c}`)) {
       if (isLockedEdge(key, correctSideMap)) lockedKeys.add(key);
@@ -240,6 +281,7 @@ export default function PlayPuzzle({ puzzle, title, subtitle, name, dayNumber, c
   }
 
   function resetPuzzle() {
+    if (solving) return; // don't yank the board out from under an in-progress auto-solve
     setGrid(dealPuzzle(puzzle));
     setSelected(null);
     setSolved(false); setSolvedSides(null);
@@ -247,13 +289,14 @@ export default function PlayPuzzle({ puzzle, title, subtitle, name, dayNumber, c
     setWrongCount(0); setNagVisible(false); setShake(false);
     setRevealed(false); setRevealedSides(null); setRevealAnim(false);
     setSwapAnim({}); setDragState(null); setSolveAnim(false);
+    setSolving(false);
     setShareMsg("");
     pointerDrag.current = null;
     clearTimeout(nagTimer.current);
   }
 
   async function onShare() {
-    const text = buildShareText({ name, dayNumber, guesses, revealed });
+    const text = buildShareText({ name, guesses, revealed });
     const r = await shareResult(text);
     setShareMsg(r === "failed" ? "Couldn't copy" : r === "shared" ? "Shared!" : "Copied!");
     setTimeout(() => setShareMsg(""), 2200);
@@ -321,25 +364,28 @@ export default function PlayPuzzle({ puzzle, title, subtitle, name, dayNumber, c
         <button onClick={onBack} style={ghostBtn}>← Menu</button>
       </div>
 
-      <h1 style={{ fontSize: "30px", fontWeight: 800, letterSpacing: "-1px", margin: "0 0 2px" }}>
-        {title}
+      <div style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "2px", textTransform: "uppercase", color: "#3a3a4a", marginBottom: "4px" }}>
+        Square Up
+      </div>
+      <h1 style={{ fontSize: "26px", fontWeight: 800, letterSpacing: "-0.5px", margin: "0 0 2px", textAlign: "center", maxWidth: "420px", padding: "0 8px" }}>
+        {name || "Untitled puzzle"}
       </h1>
       <p style={{ color: "#555", fontSize: "13px", margin: "0 0 12px", textAlign: "center" }}>
         {subtitle}
       </p>
 
-      {(canSave || justSaved) && (
+      {onSave && (
         <button
-          onClick={canSave ? onSave : undefined}
-          disabled={!canSave}
+          onClick={isSaved ? undefined : () => { onSave(); setJustSaved(true); }}
+          disabled={isSaved}
           style={{
             ...ghostBtn,
-            color: justSaved ? "#5CC877" : "#cfa93a",
-            borderColor: justSaved ? "#1a3a1a" : "#3a3018",
-            cursor: canSave ? "pointer" : "default",
+            color: isSaved ? "#5CC877" : "#cfa93a",
+            borderColor: isSaved ? "#1a3a1a" : "#3a3018",
+            cursor: isSaved ? "default" : "pointer",
             marginBottom: "12px",
           }}>
-          {justSaved ? "✓ Saved to My Puzzles" : "☆ Save to My Puzzles"}
+          {isSaved ? "✓ Saved in My Puzzles" : "☆ Save to My Puzzles"}
         </button>
       )}
 
@@ -359,10 +405,29 @@ export default function PlayPuzzle({ puzzle, title, subtitle, name, dayNumber, c
             <li><strong>Tap</strong> a word then <strong>tap</strong> another to swap</li>
             <li>Or <strong>slide</strong> a word onto another to swap</li>
             <li>Each side must form a category · corner words belong to both adjacent sides</li>
-            <li>Tap <strong>Check</strong> in the centre when you're ready</li>
+            <li>Tap the green <strong>✓</strong> in the center when you're ready</li>
           </ul>
         </div>
       )}
+
+      <div style={{ display: "flex", alignItems: "center", gap: "9px", marginBottom: "16px", minHeight: "16px" }}>
+        <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "#555" }}>
+          Attempts
+        </span>
+        <div style={{ display: "flex", gap: "5px" }}>
+          {Array.from({ length: MAX_ATTEMPTS }).map((_, i) => (
+            <span key={i} style={{
+              width: "10px", height: "10px", borderRadius: "50%",
+              background: i < wrongCount ? "#E8433A" : "#2e2e3e",
+              boxShadow: i < wrongCount ? "0 0 6px rgba(232,67,58,0.55)" : "none",
+              transition: "background 0.3s, box-shadow 0.3s",
+            }} />
+          ))}
+        </div>
+        <span style={{ fontSize: "11px", fontWeight: 700, color: solved || revealed ? "#555" : attemptsLeft === 1 && !solving ? "#E8433A" : "#666" }}>
+          {solved ? "solved" : revealed ? "answer shown" : solving ? "solving…" : `${attemptsLeft} left`}
+        </span>
+      </div>
 
       <div style={{ width: `${4 * CELL + 3 * GAP}px`, textAlign: "center", marginBottom: "4px", minHeight: "16px" }}>
         <span style={{
@@ -394,22 +459,28 @@ export default function PlayPuzzle({ puzzle, title, subtitle, name, dayNumber, c
             Array.from({ length: 4 }, (_, c) => {
               if (INNER_CELLS.has(`${r},${c}`)) {
                 if (r === 1 && c === 1) {
+                  const clickable = !solved && !revealed && !solving;
                   return (
                     <div key="center" style={{
-                      gridColumn: "2/4", gridRow: "2/4", borderRadius: "12px",
-                      display: "flex", flexDirection: "column",
-                      alignItems: "center", justifyContent: "center", gap: "4px",
-                      background: solved ? "#0a1f0e" : revealed ? "#1a0a0a" : "#1e2a1e",
-                      border: solved ? "1px solid #2a5a32" : revealed ? "1px solid #5a1a1a" : "1px solid #3a5a3a",
-                      cursor: (!solved && !revealed) ? "pointer" : "default",
-                      transition: "all 0.2s",
-                    }} onClick={(!solved && !revealed) ? checkSolution : undefined}>
-                      {solved
-                        ? (<><span style={{ fontSize: "26px" }}>🎉</span><span style={{ fontSize: "11px", fontWeight: 700, color: "#5CC877", textAlign: "center", lineHeight: 1.3 }}>Solved!</span></>)
-                        : revealed
-                        ? (<><span style={{ fontSize: "22px" }}>😤</span><span style={{ fontSize: "10px", fontWeight: 700, color: "#dd4444", textAlign: "center", lineHeight: 1.3 }}>Answer</span></>)
-                        : (<><span style={{ fontSize: "18px" }}>✓</span><span style={{ fontSize: "11px", fontWeight: 700, color: "#8aba8a", textAlign: "center", lineHeight: 1.3 }}>Check</span></>)
-                      }
+                      gridColumn: "2/4", gridRow: "2/4",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <button
+                        aria-label={solved ? "Solved" : revealed ? "Answer" : "Check"}
+                        onClick={clickable ? checkSolution : undefined}
+                        style={{
+                          width: "58px", height: "58px", borderRadius: "50%", padding: 0,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: "27px", lineHeight: 1,
+                          background: solved ? "#123018" : revealed ? "#2a0e0e" : "#1f9d40",
+                          border: solved ? "2px solid #2a5a32" : revealed ? "2px solid #5a1a1a" : "none",
+                          color: "#fff",
+                          cursor: clickable ? "pointer" : "default",
+                          boxShadow: clickable ? "0 4px 14px rgba(31,157,64,0.5)" : "none",
+                          transition: "all 0.2s",
+                        }}>
+                        {solved ? "🎉" : revealed ? "😤" : "✓"}
+                      </button>
                     </div>
                   );
                 }
@@ -529,14 +600,14 @@ export default function PlayPuzzle({ puzzle, title, subtitle, name, dayNumber, c
             borderRadius: "12px", display: "flex", alignItems: "center", gap: "12px",
           }}>
             <span style={{ fontSize: "30px", display: "inline-block" }}>
-              {NAG_MESSAGES[Math.min(wrongCount - 1, 2)].emoji}
+              {NAG_MESSAGES[Math.min(wrongCount - 1, 3)].emoji}
             </span>
             <div>
               <div style={{ fontWeight: 800, fontSize: "15px", color: "#d9b14a" }}>
-                {NAG_MESSAGES[Math.min(wrongCount - 1, 2)].text}
+                {NAG_MESSAGES[Math.min(wrongCount - 1, 3)].text}
               </div>
               <div style={{ fontSize: "12px", color: "#998044", marginTop: "2px" }}>
-                {NAG_MESSAGES[Math.min(wrongCount - 1, 2)].sub}
+                {NAG_MESSAGES[Math.min(wrongCount - 1, 3)].sub}
               </div>
             </div>
           </div>
@@ -573,17 +644,19 @@ export default function PlayPuzzle({ puzzle, title, subtitle, name, dayNumber, c
         </div>
       ) : (
         <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
-          <button onClick={shufflePuzzle} disabled={solved} style={{
+          <button onClick={shufflePuzzle} disabled={solving} style={{
             padding: "10px 24px", borderRadius: "10px",
             background: "#131320", color: "#888", fontWeight: 600, fontSize: "14px",
             border: "1px solid #222232",
-            cursor: solved ? "default" : "pointer",
-            opacity: solved ? 0.35 : 1,
+            cursor: solving ? "default" : "pointer",
+            opacity: solving ? 0.35 : 1,
           }}>Shuffle</button>
-          <button onClick={resetPuzzle} style={{
+          <button onClick={resetPuzzle} disabled={solving} style={{
             padding: "10px 24px", borderRadius: "10px",
             background: "#131320", color: "#888", fontWeight: 600, fontSize: "14px",
-            border: "1px solid #222232", cursor: "pointer",
+            border: "1px solid #222232",
+            cursor: solving ? "default" : "pointer",
+            opacity: solving ? 0.35 : 1,
           }}>Reset</button>
         </div>
       )}

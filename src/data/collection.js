@@ -1,6 +1,7 @@
-// Compiles the human-authored PUZZLE_DEFS (see puzzles.js) into runtime
-// puzzle objects, and handles daily / random selection. Keep the *data* in
-// puzzles.js easy to read; keep the *logic* here.
+// Compiles the human-authored PUZZLE_DEFS (see puzzles.js) into runtime puzzle
+// objects. Keep the *data* in puzzles.js easy to read; keep the *logic* here.
+// (Currently used by the puzzle validator; the app itself plays user-built
+// puzzles, so there is no daily selection here.)
 
 import { PALETTE } from "../engine/geometry.js";
 import { derivePuzzle } from "../engine/engine.js";
@@ -37,26 +38,3 @@ export function compileDef(def) {
 }
 
 export const PUZZLES = PUZZLE_DEFS.map(compileDef);
-
-export function puzzleById(id) {
-  return PUZZLES.find((p) => p.id === id) ?? null;
-}
-
-// ── Daily puzzle ──────────────────────────────────────────────────────
-// Deterministic by UTC date, so everyone gets the same puzzle each day.
-const LAUNCH_EPOCH_UTC = Date.UTC(2025, 0, 1); // 2025-01-01
-
-export function dayNumber(date = new Date()) {
-  const todayUTC = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
-  return Math.floor((todayUTC - LAUNCH_EPOCH_UTC) / 86400000);
-}
-
-export function dailyPuzzle(date = new Date()) {
-  const n = dayNumber(date);
-  const idx = ((n % PUZZLES.length) + PUZZLES.length) % PUZZLES.length;
-  return { ...PUZZLES[idx], dayNumber: n };
-}
-
-export function formatPuzzleDate(date = new Date()) {
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}

@@ -32,7 +32,7 @@ export async function shareResult(text) {
       return "shared";
     }
   } catch {
-    // user cancelled the share sheet — fall through to clipboard
+    // user canceled the share sheet — fall through to clipboard
   }
   try {
     await navigator.clipboard.writeText(text);

@@ -31,9 +31,29 @@ export function countSaved() {
   return readAll().length;
 }
 
-// Save a source ({ title, names, cells }). Returns the stored record, or null
-// if storage is unavailable.
+// Content fingerprint of a puzzle (names + words), so we can detect when an
+// opened puzzle is already saved and avoid duplicates.
+export function sourceSignature(source) {
+  const names = ["top", "right", "bottom", "left"]
+    .map((s) => (source.names[s] || "").trim().toLowerCase()).join("");
+  const cells = (source.cells || []).map((w) => (w || "").trim().toLowerCase()).join("");
+  return names + "" + cells;
+}
+
+export function findSaved(source) {
+  const sig = sourceSignature(source);
+  return readAll().find((rec) => sourceSignature(rec) === sig) || null;
+}
+
+export function isSaved(source) {
+  return !!findSaved(source);
+}
+
+// Save a source ({ title, names, cells }). If an identical puzzle is already
+// saved, returns the existing record instead of creating a duplicate.
 export function saveSource(source) {
+  const existing = findSaved(source);
+  if (existing) return existing;
   const list = readAll();
   const rec = {
     id: "u" + Math.random().toString(36).slice(2, 9),
@@ -44,6 +64,16 @@ export function saveSource(source) {
   };
   list.unshift(rec);
   return writeAll(list) ? rec : null;
+}
+
+// Update an existing saved puzzle (used by the edit flow). Falls back to a
+// fresh save if the id is gone.
+export function updateSource(id, source) {
+  const list = readAll();
+  const i = list.findIndex((p) => p.id === id);
+  if (i < 0) return saveSource(source);
+  list[i] = { ...list[i], title: source.title, names: source.names, cells: source.cells };
+  return writeAll(list) ? list[i] : null;
 }
 
 export function deleteSaved(id) {

@@ -1,19 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import MenuScreen from "./components/MenuScreen.jsx";
 import MyPuzzles from "./components/MyPuzzles.jsx";
 import BuilderScreen from "./components/BuilderScreen.jsx";
 import PlayPuzzle from "./components/PlayPuzzle.jsx";
 import { compileSource } from "./engine/builder.js";
-import { saveSource } from "./lib/storage.js";
+import { saveSource, updateSource, isSaved } from "./lib/storage.js";
 import { readSharedFromUrl, clearShareHash } from "./lib/puzzleCodec.js";
 
 let keySeq = 0;
 const nextKey = () => `p${++keySeq}`;
 
-function subtitleFor({ daily, custom }) {
-  if (daily) return "Swap words until each side is a category · corners link two sides";
-  if (custom) return "Each side a category · corners link two sides";
-  return "Swap words until each side is a category · corners link two sides";
+const SUBTITLE = "Each side a category · corners link two sides";
+
+function makeActive(puzzle, source) {
+  return {
+    key: nextKey(),
+    puzzle,
+    name: source.title,
+    subtitle: SUBTITLE,
+    source,
+    saved: isSaved(source),
+  };
 }
 
 // If the app was opened from a share link, build the starting state from it.
@@ -22,20 +29,7 @@ function bootState() {
   if (src) {
     const res = compileSource(src);
     clearShareHash();
-    if (res.ok) {
-      return {
-        screen: "play",
-        active: {
-          key: nextKey(),
-          puzzle: res.puzzle,
-          name: src.title,
-          subtitle: subtitleFor({ custom: true }),
-          dayNumber: null,
-          source: src,     // so it can be saved
-          canSave: true,
-        },
-      };
-    }
+    if (res.ok) return { screen: "play", active: makeActive(res.puzzle, src) };
   }
   return { screen: "menu", active: null };
 }
@@ -44,52 +38,42 @@ export default function App() {
   const [boot] = useState(bootState);
   const [screen, setScreen] = useState(boot.screen);
   const [active, setActive] = useState(boot.active);
+  const [editing, setEditing] = useState(null); // saved rec being edited, or null
 
-  function playDaily(daily) {
-    setActive({
-      key: nextKey(),
-      puzzle: daily.puzzle,
-      name: daily.title,
-      subtitle: subtitleFor({ daily: true }),
-      dayNumber: daily.dayNumber,
-      source: null,
-      canSave: false,
-    });
-    setScreen("play");
-  }
+  // If a share link is pasted while the app is already open, react to it.
+  useEffect(() => {
+    function onHash() {
+      const src = readSharedFromUrl();
+      if (!src) return;
+      const res = compileSource(src);
+      clearShareHash();
+      if (res.ok) { setActive(makeActive(res.puzzle, src)); setScreen("play"); }
+    }
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
-  function playSource(source, puzzle, { canSave }) {
-    setActive({
-      key: nextKey(),
-      puzzle,
-      name: source.title,
-      subtitle: subtitleFor({ custom: true }),
-      dayNumber: null,
-      source,
-      canSave,
-    });
+  function playSource(source, puzzle) {
+    setActive(makeActive(puzzle, source));
     setScreen("play");
   }
 
   function playSaved(rec) {
     const res = compileSource(rec);
-    if (!res.ok) return; // corrupt record — ignore
-    // Already in the list, so no save affordance needed.
-    playSource(rec, res.puzzle, { canSave: false });
+    if (res.ok) playSource(rec, res.puzzle);
   }
 
   function saveActive() {
     if (!active?.source) return;
-    saveSource(active.source);
-    setActive((a) => ({ ...a, canSave: false, justSaved: true }));
+    saveSource(active.source); // de-dupes if already saved
+    setActive((a) => ({ ...a, saved: true }));
   }
 
   if (screen === "menu") {
     return (
       <MenuScreen
-        onPlayDaily={playDaily}
         onMyPuzzles={() => setScreen("myPuzzles")}
-        onBuild={() => setScreen("build")}
+        onBuild={() => { setEditing(null); setScreen("build"); }}
       />
     );
   }
@@ -98,7 +82,8 @@ export default function App() {
     return (
       <MyPuzzles
         onPlay={playSaved}
-        onBuild={() => setScreen("build")}
+        onEdit={(rec) => { setEditing(rec); setScreen("build"); }}
+        onBuild={() => { setEditing(null); setScreen("build"); }}
         onBack={() => setScreen("menu")}
       />
     );
@@ -107,9 +92,17 @@ export default function App() {
   if (screen === "build") {
     return (
       <BuilderScreen
-        onBack={() => setScreen("menu")}
-        onPlay={(puzzle, source) => playSource(source, puzzle, { canSave: true })}
-        onSave={(source) => { saveSource(source); setScreen("myPuzzles"); }}
+        key={editing ? editing.id : "new"}
+        initial={editing}
+        editing={!!editing}
+        onBack={() => { const e = editing; setEditing(null); setScreen(e ? "myPuzzles" : "menu"); }}
+        onPlay={(puzzle, source) => playSource(source, puzzle)}
+        onSave={(source) => {
+          if (editing) updateSource(editing.id, source);
+          else saveSource(source);
+          setEditing(null);
+          setScreen("myPuzzles");
+        }}
       />
     );
   }
@@ -119,12 +112,9 @@ export default function App() {
     <PlayPuzzle
       key={active.key}
       puzzle={active.puzzle}
-      title="Square Up"
       subtitle={active.subtitle}
       name={active.name}
-      dayNumber={active.dayNumber}
-      canSave={active.canSave}
-      justSaved={active.justSaved}
+      saved={active.saved}
       onSave={saveActive}
       onBack={() => setScreen("menu")}
     />

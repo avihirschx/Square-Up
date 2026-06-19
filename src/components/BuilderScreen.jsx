@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { INNER_CELLS, GRID_CORNERS, CELL, GAP } from "../engine/geometry.js";
-import { parseSquareToPuzzle, gridToCells } from "../engine/builder.js";
+import { parseSquareToPuzzle, gridToCells, sourceToGrid } from "../engine/builder.js";
 import { buildShareUrl } from "../lib/puzzleCodec.js";
 import { shareResult } from "../lib/share.js";
 
-export default function BuilderScreen({ onPlay, onSave, onBack }) {
-  const [cells, setCells] = useState(() => Array(4).fill(null).map(() => Array(4).fill("")));
-  const [names, setNames] = useState({ top: "", right: "", bottom: "", left: "" });
-  const [title, setTitle] = useState("");
+export default function BuilderScreen({ onPlay, onSave, onBack, initial, editing }) {
+  const [cells, setCells] = useState(() =>
+    initial ? sourceToGrid(initial) : Array(4).fill(null).map(() => Array(4).fill("")));
+  const [names, setNames] = useState(() =>
+    initial ? { ...initial.names } : { top: "", right: "", bottom: "", left: "" });
+  const [title, setTitle] = useState(() => (initial ? initial.title : ""));
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
 
@@ -103,12 +105,12 @@ export default function BuilderScreen({ onPlay, onSave, onBack }) {
       </div>
 
       <h1 style={{ fontSize: "26px", fontWeight: 800, letterSpacing: "-0.5px", margin: "0 0 2px" }}>
-        Build a puzzle
+        {editing ? "Edit puzzle" : "Build a puzzle"}
       </h1>
       <p style={{ color: "#666", fontSize: "13px", margin: "0 0 4px", textAlign: "center", maxWidth: "440px" }}>
         Fill the square. Each <strong>side</strong> is one category (name it on that edge).
         The four <strong>corner</strong> tiles are shared by the two sides they touch — so a
-        corner word must belong to <em>both</em> neighbouring categories.
+        corner word must belong to <em>both</em> neighboring categories.
       </p>
       <button onClick={loadExample} style={{
         background: "none", border: "1px solid #252535", borderRadius: "6px",
@@ -120,7 +122,7 @@ export default function BuilderScreen({ onPlay, onSave, onBack }) {
         style={{ ...nameInput, width: `${4 * CELL + 3 * GAP}px`, marginBottom: "16px", fontSize: "13px" }} />
 
       <input value={names.top} onChange={(e) => setName("top", e.target.value)}
-        placeholder="Top category"
+        placeholder="Top"
         style={{ ...nameInput, width: `${4 * CELL + 3 * GAP}px`, marginBottom: "6px" }} />
 
       <div style={{ display: "flex", alignItems: "stretch", gap: "6px" }}>
@@ -174,7 +176,7 @@ export default function BuilderScreen({ onPlay, onSave, onBack }) {
       </div>
 
       <input value={names.bottom} onChange={(e) => setName("bottom", e.target.value)}
-        placeholder="Bottom category"
+        placeholder="Bottom"
         style={{ ...nameInput, width: `${4 * CELL + 3 * GAP}px`, marginTop: "6px" }} />
 
       {error && (
@@ -197,7 +199,7 @@ export default function BuilderScreen({ onPlay, onSave, onBack }) {
           padding: "12px 24px", borderRadius: "10px",
           background: "#16161f", color: "#ddd", fontWeight: 800, fontSize: "15px",
           border: "1px solid #2c2c40", cursor: "pointer",
-        }}>Save</button>
+        }}>{editing ? "Save changes" : "Save"}</button>
         <button onClick={doCopyLink} style={{
           padding: "12px 24px", borderRadius: "10px",
           background: "#16161f", color: "#ddd", fontWeight: 800, fontSize: "15px",
@@ -210,8 +212,8 @@ export default function BuilderScreen({ onPlay, onSave, onBack }) {
       </div>
 
       <p style={{ color: "#444", fontSize: "11px", marginTop: "8px", maxWidth: "420px", textAlign: "center", lineHeight: 1.6 }}>
-        Tip: the corner tiles (highlighted) sit between two sides. Read clockwise — the
-        top-right corner belongs to both the top and right categories, and so on.
+        Tip: the corner tiles (highlighted) are shared by the two sides they touch — the
+        top-right corner belongs to both the top and right categories.
         <br /><strong>Save</strong> keeps it in “My Puzzles” on this device. <strong>Copy share
         link</strong> makes a link that contains the whole puzzle — anyone who opens it can play.
       </p>
