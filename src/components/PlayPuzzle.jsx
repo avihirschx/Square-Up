@@ -15,7 +15,7 @@ const NAG_MESSAGES = [
   { emoji: "💡", text: "Here's the answer", sub: "Have a look." },
 ];
 
-export default function PlayPuzzle({ puzzle, title, subtitle, dayNumber, onBack }) {
+export default function PlayPuzzle({ puzzle, title, subtitle, name, dayNumber, canSave, justSaved, onSave, onBack }) {
   const { colors, cornerWordColors, fallbackGrid } = puzzle;
 
   const [grid, setGrid]                     = useState(() => dealPuzzle(puzzle));
@@ -253,7 +253,7 @@ export default function PlayPuzzle({ puzzle, title, subtitle, dayNumber, onBack 
   }
 
   async function onShare() {
-    const text = buildShareText({ title, dayNumber, guesses, revealed });
+    const text = buildShareText({ name, dayNumber, guesses, revealed });
     const r = await shareResult(text);
     setShareMsg(r === "failed" ? "Couldn't copy" : r === "shared" ? "Shared!" : "Copied!");
     setTimeout(() => setShareMsg(""), 2200);
@@ -327,6 +327,21 @@ export default function PlayPuzzle({ puzzle, title, subtitle, dayNumber, onBack 
       <p style={{ color: "#555", fontSize: "13px", margin: "0 0 12px", textAlign: "center" }}>
         {subtitle}
       </p>
+
+      {(canSave || justSaved) && (
+        <button
+          onClick={canSave ? onSave : undefined}
+          disabled={!canSave}
+          style={{
+            ...ghostBtn,
+            color: justSaved ? "#5CC877" : "#cfa93a",
+            borderColor: justSaved ? "#1a3a1a" : "#3a3018",
+            cursor: canSave ? "pointer" : "default",
+            marginBottom: "12px",
+          }}>
+          {justSaved ? "✓ Saved to My Puzzles" : "☆ Save to My Puzzles"}
+        </button>
+      )}
 
       <button onClick={() => setShowInstructions((v) => !v)} style={{ ...ghostBtn, color: "#666", padding: "4px 12px", marginBottom: "14px" }}>
         {showInstructions ? "Hide" : "How to play"}

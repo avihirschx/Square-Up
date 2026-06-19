@@ -14,8 +14,22 @@ them into a square so all four edges *and* the four shared corners work at once.
 - **Tap** a word, then tap another to swap them — or **drag** one onto another.
 - Each side must form a category; the corner tiles are shared by both neighbours.
 - Hit **Check** in the centre. Correct sides lock in as a hint.
-- A new **daily puzzle** rotates by date, plus a library of others and a builder
-  for your own.
+- Play the **daily puzzle**, or **build your own**: name a square, **save** it to
+  "My Puzzles" (stored on your device), and **share** it with a link that
+  contains the entire puzzle — no server, no account.
+
+## Make & share your own puzzles
+
+The Builder turns a filled square into a real puzzle. From there you can:
+
+- **Save** it to *My Puzzles* (persisted in `localStorage` on this device).
+- **Copy share link** — the whole puzzle is compressed into the URL
+  (`…/#p=…`, ~230 chars via [lz-string](https://github.com/pieroxy/lz-string)).
+  Anyone who opens it plays it and can save it to *their* device. Nothing is
+  stored centrally; the link *is* the puzzle.
+
+> This keeps the app fully static and free to host. A global "community gallery"
+> would need a shared backend (e.g. Supabase) — a possible future addition.
 
 ## Develop
 
@@ -31,13 +45,16 @@ npm run preview    # preview the production build
 
 ```
 src/
-  engine/      pure game logic (no React) — geometry, derive/validate/solve
-  data/        puzzles.js  ← the puzzle collection (edit here)
+  engine/      pure game logic (no React) — geometry, derive/validate/solve,
+               builder (square → puzzle, source ↔ grid helpers)
+  data/        puzzles.js  ← built-in puzzles (edit here)
                collection.js — compiles puzzles + daily selection
-  components/  PlayPuzzle, BuilderScreen, MenuScreen, PuzzleSelect
-  lib/         share.js — Wordle-style result sharing
+  components/  PlayPuzzle, BuilderScreen, MenuScreen, MyPuzzles
+  lib/         storage.js     — "My Puzzles" (localStorage)
+               puzzleCodec.js — compress a puzzle into a share link
+               share.js       — Wordle-style result sharing
 scripts/
-  validate-puzzles.mjs   the puzzle "attacker"
+  validate-puzzles.mjs   the built-in puzzle "attacker"
 ```
 
 ## Adding or rejecting puzzles

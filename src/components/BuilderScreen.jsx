@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { INNER_CELLS, GRID_CORNERS, CELL, GAP } from "../engine/geometry.js";
-import { parseSquareToPuzzle } from "../engine/builder.js";
+import { parseSquareToPuzzle, gridToCells } from "../engine/builder.js";
+import { buildShareUrl } from "../lib/puzzleCodec.js";
+import { shareResult } from "../lib/share.js";
 
-export default function BuilderScreen({ onBuild, onBack }) {
-  // 4×4 grid of strings; only the 12 outer cells are editable.
+export default function BuilderScreen({ onPlay, onSave, onBack }) {
   const [cells, setCells] = useState(() => Array(4).fill(null).map(() => Array(4).fill("")));
   const [names, setNames] = useState({ top: "", right: "", bottom: "", left: "" });
+  const [title, setTitle] = useState("");
   const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
 
   const setCell = (r, c, v) => {
     setCells((prev) => {
@@ -18,10 +21,44 @@ export default function BuilderScreen({ onBuild, onBack }) {
   };
   const setName = (side, v) => { setNames((prev) => ({ ...prev, [side]: v })); setError(""); };
 
-  function tryBuild() {
+  function flashToast(msg) {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2200);
+  }
+
+  // Validate the square; on success returns { puzzle, source }, else shows the
+  // error and returns null.
+  function validated({ requireTitle = false } = {}) {
     const res = parseSquareToPuzzle(cells, names);
-    if (!res.ok) { setError(res.error); return; }
-    onBuild(res.puzzle);
+    if (!res.ok) { setError(res.error); return null; }
+    const cleanTitle = title.trim();
+    if (requireTitle && !cleanTitle) { setError("Give your puzzle a name first."); return null; }
+    const source = {
+      title: cleanTitle || "Untitled puzzle",
+      names: {
+        top: names.top.trim(), right: names.right.trim(),
+        bottom: names.bottom.trim(), left: names.left.trim(),
+      },
+      cells: gridToCells(cells),
+    };
+    return { puzzle: res.puzzle, source };
+  }
+
+  function doPlay() {
+    const v = validated();
+    if (v) onPlay(v.puzzle, v.source);
+  }
+
+  function doSave() {
+    const v = validated({ requireTitle: true });
+    if (v) onSave(v.source);
+  }
+
+  async function doCopyLink() {
+    const v = validated();
+    if (!v) return;
+    const r = await shareResult(buildShareUrl(v.source));
+    flashToast(r === "failed" ? "Couldn't copy link" : r === "shared" ? "Link shared!" : "Link copied!");
   }
 
   function loadExample() {
@@ -34,6 +71,7 @@ export default function BuilderScreen({ onBuild, onBack }) {
     ex[2][0] = "Wren"; ex[1][0] = "Finch";
     setCells(ex.map((row) => [...row]));
     setNames({ top: "Programming languages", right: "Snakes", bottom: "Car models", left: "Birds" });
+    setTitle("Founding Four");
     setError("");
   }
 
@@ -74,8 +112,12 @@ export default function BuilderScreen({ onBuild, onBack }) {
       </p>
       <button onClick={loadExample} style={{
         background: "none", border: "1px solid #252535", borderRadius: "6px",
-        color: "#777", fontSize: "12px", padding: "4px 12px", cursor: "pointer", margin: "6px 0 18px",
+        color: "#777", fontSize: "12px", padding: "4px 12px", cursor: "pointer", margin: "6px 0 16px",
       }}>Load example</button>
+
+      <input value={title} onChange={(e) => { setTitle(e.target.value); setError(""); }}
+        placeholder="Puzzle name (e.g. “Jacob’s Square”)"
+        style={{ ...nameInput, width: `${4 * CELL + 3 * GAP}px`, marginBottom: "16px", fontSize: "13px" }} />
 
       <input value={names.top} onChange={(e) => setName("top", e.target.value)}
         placeholder="Top category"
@@ -145,15 +187,33 @@ export default function BuilderScreen({ onBuild, onBack }) {
         </div>
       )}
 
-      <button onClick={tryBuild} style={{
-        marginTop: "22px", padding: "12px 32px", borderRadius: "10px",
-        background: "#2A7AE4", color: "#fff", fontWeight: 800, fontSize: "15px",
-        border: "none", cursor: "pointer", boxShadow: "0 4px 16px rgba(42,122,228,0.35)",
-      }}>Play this puzzle →</button>
+      <div style={{ display: "flex", gap: "10px", marginTop: "20px", flexWrap: "wrap", justifyContent: "center" }}>
+        <button onClick={doPlay} style={{
+          padding: "12px 28px", borderRadius: "10px",
+          background: "#2A7AE4", color: "#fff", fontWeight: 800, fontSize: "15px",
+          border: "none", cursor: "pointer", boxShadow: "0 4px 16px rgba(42,122,228,0.35)",
+        }}>Play →</button>
+        <button onClick={doSave} style={{
+          padding: "12px 24px", borderRadius: "10px",
+          background: "#16161f", color: "#ddd", fontWeight: 800, fontSize: "15px",
+          border: "1px solid #2c2c40", cursor: "pointer",
+        }}>Save</button>
+        <button onClick={doCopyLink} style={{
+          padding: "12px 24px", borderRadius: "10px",
+          background: "#16161f", color: "#ddd", fontWeight: 800, fontSize: "15px",
+          border: "1px solid #2c2c40", cursor: "pointer",
+        }}>Copy share link</button>
+      </div>
 
-      <p style={{ color: "#444", fontSize: "11px", marginTop: "16px", maxWidth: "420px", textAlign: "center", lineHeight: 1.6 }}>
+      <div style={{ height: "18px", marginTop: "10px", fontSize: "13px", color: "#5CC877", fontWeight: 700 }}>
+        {toast}
+      </div>
+
+      <p style={{ color: "#444", fontSize: "11px", marginTop: "8px", maxWidth: "420px", textAlign: "center", lineHeight: 1.6 }}>
         Tip: the corner tiles (highlighted) sit between two sides. Read clockwise — the
         top-right corner belongs to both the top and right categories, and so on.
+        <br /><strong>Save</strong> keeps it in “My Puzzles” on this device. <strong>Copy share
+        link</strong> makes a link that contains the whole puzzle — anyone who opens it can play.
       </p>
     </div>
   );

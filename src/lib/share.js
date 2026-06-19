@@ -3,9 +3,9 @@
 
 const SQUARE_LOGO = "🟨🟥\n🟦🟩"; // top·right / left·bottom — the four side colors
 
-export function buildShareText({ title, dayNumber, guesses, revealed }) {
+export function buildShareText({ name, dayNumber, guesses, revealed }) {
   const heading =
-    dayNumber != null ? `Square Up #${dayNumber}` : `Square Up — ${title}`;
+    dayNumber != null ? `Square Up #${dayNumber}` : name ? `Square Up — ${name}` : "Square Up";
 
   let result;
   if (revealed) {

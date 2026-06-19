@@ -49,6 +49,24 @@ export function parseSquareToPuzzle(grid4x4, names) {
   return { ok: true, puzzle: derivePuzzle({ edgeWords, corners, colors }) };
 }
 
-// Lay a derived puzzle's fallback solution back out as a 4×4 grid of
-// strings (used by the Builder "Load example" button).
+// ── Source <-> grid helpers ──
+// A "source" stores the 12 outer words (OUTER_CELLS order) + names + title —
+// the minimal data to save or share a user puzzle.
+
+export function sourceToGrid(source) {
+  const g = Array(4).fill(null).map(() => Array(4).fill(""));
+  OUTER_CELLS.forEach(([r, c], i) => { g[r][c] = source.cells[i] ?? ""; });
+  return g;
+}
+
+export function gridToCells(grid) {
+  return OUTER_CELLS.map(([r, c]) => (grid[r][c] || "").trim());
+}
+
+// Compile a saved/shared source into a playable puzzle. Returns the same
+// shape as parseSquareToPuzzle: { ok, puzzle } or { ok:false, error }.
+export function compileSource(source) {
+  return parseSquareToPuzzle(sourceToGrid(source), source.names);
+}
+
 export { GRID_CORNERS };

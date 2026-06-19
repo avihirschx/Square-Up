@@ -1,7 +1,9 @@
 import { dailyPuzzle, formatPuzzleDate } from "../data/collection.js";
+import { countSaved } from "../lib/storage.js";
 
-export default function MenuScreen({ onPlayDaily, onBrowse, onBuild }) {
+export default function MenuScreen({ onPlayDaily, onMyPuzzles, onBuild }) {
   const daily = dailyPuzzle();
+  const saved = countSaved();
 
   return (
     <div style={{
@@ -39,20 +41,29 @@ export default function MenuScreen({ onPlayDaily, onBrowse, onBuild }) {
             #{daily.dayNumber} · {formatPuzzleDate()}
           </span>
         </button>
-        <button onClick={onBrowse} style={{
-          padding: "16px", borderRadius: "14px",
-          background: "#16161f", color: "#ddd", fontWeight: 800, fontSize: "17px",
-          border: "1px solid #2c2c40", cursor: "pointer",
-        }}>All puzzles</button>
         <button onClick={onBuild} style={{
           padding: "16px", borderRadius: "14px",
           background: "#16161f", color: "#ddd", fontWeight: 800, fontSize: "17px",
           border: "1px solid #2c2c40", cursor: "pointer",
         }}>Build your own</button>
+        <button onClick={onMyPuzzles} style={{
+          padding: "16px", borderRadius: "14px",
+          background: "#16161f", color: "#ddd", fontWeight: 800, fontSize: "17px",
+          border: "1px solid #2c2c40", cursor: "pointer",
+          display: "flex", justifyContent: "center", alignItems: "center", gap: "8px",
+        }}>
+          My Puzzles
+          {saved > 0 && (
+            <span style={{
+              fontSize: "12px", fontWeight: 800, color: "#9bf",
+              background: "#1a2440", borderRadius: "999px", padding: "2px 9px",
+            }}>{saved}</span>
+          )}
+        </button>
       </div>
 
-      <p style={{ color: "#3a3a4a", fontSize: "11px", marginTop: "40px", textAlign: "center" }}>
-        A new puzzle every day.
+      <p style={{ color: "#3a3a4a", fontSize: "11px", marginTop: "40px", textAlign: "center", maxWidth: "300px", lineHeight: 1.6 }}>
+        Build your own square, save it, and share it with a link that contains the whole puzzle.
       </p>
     </div>
   );
