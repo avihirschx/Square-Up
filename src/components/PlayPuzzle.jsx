@@ -849,7 +849,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
         </div>
       )}
 
-      {showTutorial && <Tutorial onClose={closeTutorial} />}
+      {showTutorial && <Tutorial onClose={closeTutorial} mode={puzzle.mode} />}
     </div>
   );
 }

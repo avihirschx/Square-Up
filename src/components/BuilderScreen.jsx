@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { geoForMode, CELL, GAP } from "../engine/geometry.js";
 import { parseSquareToPuzzle, gridToCells, sourceToGrid } from "../engine/builder.js";
+import { validatePuzzle } from "../engine/validate.js";
 import { buildShareUrl } from "../lib/puzzleCodec.js";
 import { shareResult } from "../lib/share.js";
 
@@ -47,6 +48,9 @@ export default function BuilderScreen({ onPlay, onSave, onBack, initial, editing
   function validated({ requireTitle = false } = {}) {
     const res = parseSquareToPuzzle(cells, names, mode, odd);
     if (!res.ok) { setError(res.error); return null; }
+    // Attack the puzzle: is it actually solvable and unambiguous?
+    const check = validatePuzzle(res.puzzle);
+    if (!check.ok) { setError(check.issues[0]); return null; }
     const cleanTitle = title.trim();
     if (requireTitle && !cleanTitle) { setError("Give your puzzle a name first."); return null; }
     const source = {
@@ -70,6 +74,17 @@ export default function BuilderScreen({ onPlay, onSave, onBack, initial, editing
   function doSave() {
     const v = validated({ requireTitle: true });
     if (v) onSave(v.source);
+  }
+
+  function doCheck() {
+    const res = parseSquareToPuzzle(cells, names, mode, odd);
+    if (!res.ok) { setError(res.error); return; }
+    const check = validatePuzzle(res.puzzle);
+    if (!check.ok) { setError(check.issues[0]); return; }
+    setError("");
+    flashToast(mode === "3x3"
+      ? "✓ Solvable, unique — odd one out is forced"
+      : "✓ Solvable & unique — ship it");
   }
 
   async function doCopyLink() {
@@ -240,6 +255,11 @@ export default function BuilderScreen({ onPlay, onSave, onBack, initial, editing
       )}
 
       <div style={{ display: "flex", gap: "10px", marginTop: "20px", flexWrap: "wrap", justifyContent: "center" }}>
+        <button onClick={doCheck} style={{
+          padding: "12px 22px", borderRadius: "10px",
+          background: "#16231a", color: "#7fd69a", fontWeight: 800, fontSize: "15px",
+          border: "1px solid #2a4a32", cursor: "pointer",
+        }}>Check ✓</button>
         <button onClick={doPlay} style={{
           padding: "12px 28px", borderRadius: "10px",
           background: "#2A7AE4", color: "#fff", fontWeight: 800, fontSize: "15px",
