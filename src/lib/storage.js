@@ -51,7 +51,8 @@ export function isSaved(source) {
 
 // Save a source ({ title, names, cells }). If an identical puzzle is already
 // saved, returns the existing record instead of creating a duplicate.
-export function saveSource(source) {
+// origin: "created" (built here, editable) | "saved" (imported, view-only).
+export function saveSource(source, origin = "saved") {
   const existing = findSaved(source);
   if (existing) return existing;
   const list = readAll();
@@ -60,6 +61,7 @@ export function saveSource(source) {
     title: source.title || "",
     names: source.names,
     cells: source.cells,
+    origin,
     createdAt: Date.now(),
   };
   list.unshift(rec);

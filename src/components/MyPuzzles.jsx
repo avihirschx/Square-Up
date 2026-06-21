@@ -96,7 +96,10 @@ export default function MyPuzzles({ onPlay, onEdit, onBuild, onBack }) {
                 </div>
                 <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
                   <button onClick={() => onPlay(rec)} style={{ ...smallBtn, background: "#1c2e1c", borderColor: "#2a4a2a", color: "#bfe6bf" }}>▶ Play</button>
-                  <button onClick={() => onEdit(rec)} style={smallBtn}>✎ Edit</button>
+                  {/* Only puzzles you built here are editable; imported ones are view-only. */}
+                  {rec.origin !== "saved" && (
+                    <button onClick={() => onEdit(rec)} style={smallBtn}>✎ Edit</button>
+                  )}
                   <button onClick={() => copyLink(rec)} style={smallBtn}>🔗 Link</button>
                   <button onClick={() => remove(rec.id)} style={{ ...smallBtn, color: "#c87a7a", borderColor: "#3a2020" }}>🗑 Delete</button>
                 </div>

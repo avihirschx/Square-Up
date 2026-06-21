@@ -13,13 +13,17 @@ const nextKey = () => `p${++keySeq}`;
 
 const SUBTITLE = "Each side a category · corners link two sides";
 
-function makeActive(puzzle, source) {
+// origin: "created" (built here) | "saved" (imported from a link / featured).
+// Only "created" puzzles are editable. The flag lives on the local record, not
+// in the share link — so opening someone's link makes you a viewer, not author.
+function makeActive(puzzle, source, origin = "saved") {
   return {
     key: nextKey(),
     puzzle,
     name: source.title,
     subtitle: SUBTITLE,
     source,
+    origin,
     saved: isSaved(source),
   };
 }
@@ -30,7 +34,7 @@ function bootState() {
   if (src) {
     const res = compileSource(src);
     clearShareHash();
-    if (res.ok) return { screen: "play", active: makeActive(res.puzzle, src) };
+    if (res.ok) return { screen: "play", active: makeActive(res.puzzle, src, "saved") };
   }
   return { screen: "menu", active: null };
 }
@@ -48,30 +52,31 @@ export default function App() {
       if (!src) return;
       const res = compileSource(src);
       clearShareHash();
-      if (res.ok) { setActive(makeActive(res.puzzle, src)); setScreen("play"); }
+      if (res.ok) { setActive(makeActive(res.puzzle, src, "saved")); setScreen("play"); }
     }
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
-  function playSource(source, puzzle) {
-    setActive(makeActive(puzzle, source));
+  function playSource(source, puzzle, origin = "saved") {
+    setActive(makeActive(puzzle, source, origin));
     setScreen("play");
   }
 
   function playSaved(rec) {
     const res = compileSource(rec);
-    if (res.ok) playSource(rec, res.puzzle);
+    // Legacy records (no origin) default to editable; "saved" stays a viewer.
+    if (res.ok) playSource(rec, res.puzzle, rec.origin === "saved" ? "saved" : "created");
   }
 
   function playFeatured() {
     const res = compileSource(FEATURED_SOURCE);
-    if (res.ok) playSource(FEATURED_SOURCE, res.puzzle);
+    if (res.ok) playSource(FEATURED_SOURCE, res.puzzle, "saved");
   }
 
   function saveActive() {
     if (!active?.source) return;
-    saveSource(active.source); // de-dupes if already saved
+    saveSource(active.source, active.origin); // de-dupes if already saved
     setActive((a) => ({ ...a, saved: true }));
   }
 
@@ -104,10 +109,10 @@ export default function App() {
         initial={editing}
         editing={!!editing}
         onBack={() => { const e = editing; setEditing(null); setScreen(e ? "myPuzzles" : "menu"); }}
-        onPlay={(puzzle, source) => playSource(source, puzzle)}
+        onPlay={(puzzle, source) => playSource(source, puzzle, "created")}
         onSave={(source) => {
           if (editing) updateSource(editing.id, source);
-          else saveSource(source);
+          else saveSource(source, "created");
           setEditing(null);
           setScreen("myPuzzles");
         }}
