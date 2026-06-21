@@ -92,7 +92,7 @@ export default function MyPuzzles({ onPlay, onEdit, onBuild, onBack }) {
               <Swatch />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 800, fontSize: "15px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {rec.title}
+                  {rec.title || <span style={{ color: "#777", fontStyle: "italic" }}>Untitled</span>}
                 </div>
                 <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
                   <button onClick={() => onPlay(rec)} style={{ ...smallBtn, background: "#1c2e1c", borderColor: "#2a4a2a", color: "#bfe6bf" }}>▶ Play</button>

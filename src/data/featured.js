@@ -2,21 +2,24 @@
 //
 // Stored as a "source" (the same shape a saved/shared puzzle uses): the 12
 // outer words in geometry.OUTER_CELLS order + the four side category names.
-// To change the featured puzzle, build one, hit "Copy share link", and paste
-// the decoded title / names / cells here — or just edit these by hand.
+// To change the featured puzzle, build one, hit "Copy share link", and decode
+// it with `node scripts/decode-link.mjs <link>` — then paste the fields here.
+//
+// title is optional: leave it "" and the play screen just shows "Square Up".
+// An easy, everyday-words puzzle makes a friendlier first impression.
 
 export const FEATURED_SOURCE = {
-  title: "Cube's Square",
+  title: "",
   names: {
-    top: "Things in a bedroom",
-    right: "Work__",
-    bottom: "Parts of a Novel",
-    left: "Encompass",
+    top: "Types of Awards",
+    right: "Sewing materials",
+    bottom: "Pointy items",
+    left: "Found on a table",
   },
   cells: [
-    "Blanket", "Pillow", "Duvet", "Sheet",  // top row
-    "Around", "Flow",                        // right edge
-    "Book", "Spine", "Title", "Cover",       // bottom row (BR→BL)
-    "Surround", "Envelop",                   // left edge (BL→TL)
+    "Cup", "Medal", "Statue", "Ribbon",   // top row
+    "Lace", "Thread",                       // right edge
+    "Needle", "Cactus", "Trident", "Fork",  // bottom row (BR→BL)
+    "Plate", "Glass",                       // left edge (BL→TL)
   ],
 };

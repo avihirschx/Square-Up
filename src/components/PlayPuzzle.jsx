@@ -489,11 +489,13 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
         <button onClick={onBack} style={ghostBtn}>← Menu</button>
       </div>
 
-      <div style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "2px", textTransform: "uppercase", color: "#3a3a4a", marginBottom: "4px" }}>
-        Square Up
-      </div>
+      {name && (
+        <div style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "2px", textTransform: "uppercase", color: "#3a3a4a", marginBottom: "4px" }}>
+          Square Up
+        </div>
+      )}
       <h1 style={{ fontSize: "26px", fontWeight: 800, letterSpacing: "-0.5px", margin: "0 0 2px", textAlign: "center", maxWidth: "420px", padding: "0 8px" }}>
-        {name || "Untitled puzzle"}
+        {name || "Square Up"}
       </h1>
       <p style={{ color: "#555", fontSize: "13px", margin: "0 0 12px", textAlign: "center" }}>
         {subtitle}

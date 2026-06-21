@@ -30,13 +30,11 @@ export default function BuilderScreen({ onPlay, onSave, onBack, initial, editing
 
   // Validate the square; on success returns { puzzle, source }, else shows the
   // error and returns null.
-  function validated({ requireTitle = false } = {}) {
+  function validated() {
     const res = parseSquareToPuzzle(cells, names);
     if (!res.ok) { setError(res.error); return null; }
-    const cleanTitle = title.trim();
-    if (requireTitle && !cleanTitle) { setError("Give your puzzle a name first."); return null; }
     const source = {
-      title: cleanTitle || "Untitled puzzle",
+      title: title.trim(), // optional — blank shows as "Square Up"
       names: {
         top: names.top.trim(), right: names.right.trim(),
         bottom: names.bottom.trim(), left: names.left.trim(),
@@ -52,7 +50,7 @@ export default function BuilderScreen({ onPlay, onSave, onBack, initial, editing
   }
 
   function doSave() {
-    const v = validated({ requireTitle: true });
+    const v = validated();
     if (v) onSave(v.source);
   }
 
@@ -118,7 +116,7 @@ export default function BuilderScreen({ onPlay, onSave, onBack, initial, editing
       }}>Load example</button>
 
       <input value={title} onChange={(e) => { setTitle(e.target.value); setError(""); }}
-        placeholder="Puzzle name (e.g. “Jacob’s Square”)"
+        placeholder="Puzzle name (optional)"
         style={{ ...nameInput, width: `${4 * CELL + 3 * GAP}px`, marginBottom: "16px", fontSize: "13px" }} />
 
       <input value={names.top} onChange={(e) => setName("top", e.target.value)}

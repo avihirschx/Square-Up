@@ -32,7 +32,7 @@ export function decodeSource(code) {
     if (!Array.isArray(cells) || cells.length !== 12) return null;
     const [top, right, bottom, left] = names.map((s) => String(s ?? ""));
     return {
-      title: String(title || "Untitled puzzle"),
+      title: String(title || ""),
       names: { top, right, bottom, left },
       cells: cells.map((s) => String(s ?? "")),
     };

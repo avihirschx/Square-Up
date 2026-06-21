@@ -57,7 +57,7 @@ export function saveSource(source) {
   const list = readAll();
   const rec = {
     id: "u" + Math.random().toString(36).slice(2, 9),
-    title: source.title || "Untitled puzzle",
+    title: source.title || "",
     names: source.names,
     cells: source.cells,
     createdAt: Date.now(),
