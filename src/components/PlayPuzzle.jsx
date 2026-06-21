@@ -13,13 +13,26 @@ import Tutorial from "./Tutorial.jsx";
 const MAX_ATTEMPTS = 4;
 const MAX_HINTS = 2;
 
-// Corner split gradients, oriented so each side's color sits on the edge that
-// faces that side's other tiles (colors flow continuously into the sides).
-const CORNER_GRAD = {
-  "0,0": (col) => `linear-gradient(45deg, ${col.left} 50%, ${col.top} 50%)`,
-  "0,3": (col) => `linear-gradient(135deg, ${col.top} 50%, ${col.right} 50%)`,
-  "3,0": (col) => `linear-gradient(135deg, ${col.left} 50%, ${col.bottom} 50%)`,
-  "3,3": (col) => `linear-gradient(45deg, ${col.bottom} 50%, ${col.right} 50%)`,
+// Corner split = two triangles meeting on the tile's true corner-to-corner
+// diagonal, pointing at the board center — so the split line is collinear with
+// the center checker's X. Each color sits on the edges facing its own side.
+const CORNER_SPLIT = {
+  "0,0": (col) => [
+    { clip: "polygon(0 0, 100% 0, 100% 100%)", color: col.top },
+    { clip: "polygon(0 0, 100% 100%, 0 100%)", color: col.left },
+  ],
+  "0,3": (col) => [
+    { clip: "polygon(0 0, 100% 0, 0 100%)", color: col.top },
+    { clip: "polygon(100% 0, 100% 100%, 0 100%)", color: col.right },
+  ],
+  "3,0": (col) => [
+    { clip: "polygon(0 0, 100% 0, 0 100%)", color: col.left },
+    { clip: "polygon(100% 0, 100% 100%, 0 100%)", color: col.bottom },
+  ],
+  "3,3": (col) => [
+    { clip: "polygon(0 0, 100% 0, 100% 100%)", color: col.right },
+    { clip: "polygon(0 0, 100% 100%, 0 100%)", color: col.bottom },
+  ],
 };
 
 // Center checker: one triangle per side (base toward its side), with an arrow
@@ -82,6 +95,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
   const [solveAnim, setSolveAnim]           = useState(false);
   const [solving, setSolving]               = useState(false);
   const [flashSide, setFlashSide]           = useState(null); // side flashing red on a wrong check
+  const [hoverSide, setHoverSide]           = useState(null); // side whose check is hovered/pressed
   const [justSaved, setJustSaved]           = useState(false);
   const [shareMsg, setShareMsg]             = useState("");
   const pointerDrag = useRef(null);
@@ -438,26 +452,26 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
     const delay = OUTER_CELLS.findIndex(([or, oc]) => or === r && oc === c) * 55;
     const entering = activeSides ? (revealed && !revealAnim) : false;
     const catOf = (side) => (activeSides ? activeSides[side] : satisfiedSides[side]);
-    const DEFAULT = { bg: "#2a2a3c", gradient: null, textColor: "#f0f0f0", isCornerSplit: false, entering, delay };
+    const DEFAULT = { bg: "#2a2a3c", splits: null, textColor: "#f0f0f0", isCornerSplit: false, entering, delay };
 
     if (isCorner) {
       const [sA, sB] = CORNER_SIDES[key];
       const cA = catOf(sA), cB = catOf(sB);
       if (cA && cB) {
-        // Both sides known → split, oriented so each color meets its side.
+        // Both sides known → split along the true diagonal toward the center.
         const col = { [sA]: colors[cA].bg, [sB]: colors[cB].bg };
-        return { bg: null, gradient: CORNER_GRAD[key](col), textColor: "#fff", isCornerSplit: true, entering, delay };
+        return { bg: null, splits: CORNER_SPLIT[key](col), textColor: "#fff", isCornerSplit: true, entering, delay };
       }
       const solo = cA || cB;
       if (solo) {
-        return { bg: colors[solo].bg, gradient: null, textColor: activeSides ? "#fff" : colors[solo].text, isCornerSplit: false, entering, delay };
+        return { bg: colors[solo].bg, splits: null, textColor: activeSides ? "#fff" : colors[solo].text, isCornerSplit: false, entering, delay };
       }
       return DEFAULT;
     }
 
     const cat = catOf(CELL_SIDE[key]);
     if (cat) {
-      return { bg: colors[cat].bg, gradient: null, textColor: activeSides ? "#fff" : colors[cat].text, isCornerSplit: false, entering, delay };
+      return { bg: colors[cat].bg, splits: null, textColor: activeSides ? "#fff" : colors[cat].text, isCornerSplit: false, entering, delay };
     }
     return DEFAULT;
   }
@@ -675,8 +689,8 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
                         </div>
                       ) : (
                         <div style={{
-                          position: "relative", width: "124px", height: "124px",
-                          borderRadius: "12px", overflow: "hidden", background: "#0d0d12",
+                          position: "relative", width: "100%", height: "100%",
+                          borderRadius: "10px", overflow: "hidden", background: "#0d0d12",
                         }}>
                           {SIDE_LIST.map((s) => {
                             const done = !!satisfiedSides[s];
@@ -685,35 +699,37 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
                             return (
                               <button key={s} aria-label={`Check ${s} side`}
                                 onClick={() => checkSide(s)} disabled={dis}
+                                onPointerEnter={() => setHoverSide(s)}
+                                onPointerLeave={() => setHoverSide((h) => (h === s ? null : h))}
+                                onPointerCancel={() => setHoverSide(null)}
                                 style={{
                                   position: "absolute", inset: 0, border: "none", padding: 0,
                                   clipPath: SIDE_CLIP[s],
                                   background: done ? colors[satisfiedSides[s]].bg : flashing ? "#8a2020" : "#1d3326",
                                   color: "#fff",
                                   cursor: dis ? "default" : "pointer",
-                                  transition: "background 0.2s",
+                                  filter: hoverSide === s ? "brightness(1.28)" : "none",
+                                  transition: "background 0.2s, filter 0.15s",
                                 }}>
                                 <span style={{
                                   position: "absolute", ...SIDE_ARROW_POS[s],
-                                  display: "flex", flexDirection: "column", alignItems: "center", gap: "0px",
-                                  fontWeight: 800, lineHeight: 1, pointerEvents: "none",
+                                  display: "flex", pointerEvents: "none",
                                   color: done ? "#fff" : "#7fcf95",
                                 }}>
-                                  {done ? (
-                                    <span style={{ fontSize: "15px" }}>✓</span>
-                                  ) : (
-                                    <>
-                                      <span style={{ fontSize: "11px" }}>{SIDE_ARROW[s]}</span>
-                                      <span style={{ fontSize: "9px", opacity: 0.85 }}>✓</span>
-                                    </>
-                                  )}
+                                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="5 12.5 10 17.5 19 7" />
+                                  </svg>
                                 </span>
                               </button>
                             );
                           })}
-                          {/* thin dark diagonals to separate the four triangles */}
-                          <div style={{ position: "absolute", left: "-21%", top: "calc(50% - 1px)", width: "142%", height: "2px", background: "#0d0d12", transform: "rotate(45deg)", pointerEvents: "none" }} />
-                          <div style={{ position: "absolute", left: "-21%", top: "calc(50% - 1px)", width: "142%", height: "2px", background: "#0d0d12", transform: "rotate(-45deg)", pointerEvents: "none" }} />
+                          {/* X drawn corner-to-corner so it lines up with the corner-tile splits */}
+                          <svg width="100%" height="100%" viewBox="0 0 171 139" preserveAspectRatio="none"
+                            style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+                            <line x1="0" y1="0" x2="171" y2="139" stroke="#0d0d12" strokeWidth="6" />
+                            <line x1="171" y1="0" x2="0" y2="139" stroke="#0d0d12" strokeWidth="6" />
+                          </svg>
                         </div>
                       )}
                     </div>
@@ -726,9 +742,10 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
               const word = grid[r][c];
               const isSel = selected?.r === r && selected?.c === c;
               const anim = swapAnim[key];
-              const { bg, gradient, textColor, isCornerSplit, entering, delay } = getCellColors(r, c);
+              const { bg, splits, textColor, isCornerSplit, entering, delay } = getCellColors(r, c);
               const isDraggingThis = dragState && pointerDrag.current?.r === r && pointerDrag.current?.c === c;
               const fullyLocked = isFullyLocked(key);
+              const inHover = hoverSide && SIDE_CELLS[hoverSide].some(([rr, cc]) => rr === r && cc === c);
 
               return (
                 <div
@@ -751,10 +768,11 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
                     outline: isSel ? "3px solid #aaaaff" : "none",
                     outlineOffset: "-3px",
                     boxShadow: isSel ? "0 0 0 3px rgba(170,170,255,0.4)" : (bg === "#2a2a3c" ? "0 2px 8px rgba(0,0,0,0.4)" : "none"),
-                    zIndex: anim ? 10 : "auto",
+                    zIndex: anim ? 10 : inHover ? 6 : "auto",
                     transform: anim
                       ? `translate(${anim.tx}px, ${anim.ty}px)`
-                      : entering ? "scale(0.5)" : isSel ? "scale(1.05)" : "scale(1)",
+                      : entering ? "scale(0.5)" : isSel ? "scale(1.05)" : inHover ? "scale(1.06)" : "scale(1)",
+                    filter: inHover ? "brightness(1.28)" : "none",
                     opacity: entering ? 0 : isDraggingThis ? 0.25 : (anim?.opacity ?? 1),
                     transition: entering
                       ? `transform 0.4s ease ${delay}ms, opacity 0.4s ease ${delay}ms`
@@ -762,17 +780,16 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
                       ? "transform 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94)"
                       : anim
                       ? "none"
-                      : "background 0.25s, outline 0.1s, box-shadow 0.1s, transform 0.15s, opacity 0.25s",
+                      : "background 0.25s, outline 0.1s, box-shadow 0.1s, transform 0.15s, opacity 0.25s, filter 0.15s",
                     animation: solveAnim ? `ring-pulse 0.6s ease ${delay}ms both` : "none",
                   }}
                 >
-                  {isCornerSplit && (
-                    <div style={{
-                      position: "absolute", inset: 0, borderRadius: "10px",
-                      background: gradient,
-                      transition: "background 0.25s",
+                  {isCornerSplit && splits && splits.map((s, i) => (
+                    <div key={i} style={{
+                      position: "absolute", inset: 0,
+                      background: s.color, clipPath: s.clip,
                     }} />
-                  )}
+                  ))}
                   <span style={{
                     position: "relative", zIndex: 1,
                     textShadow: (activeSides || isCornerSplit || (bg && bg !== "#2a2a3c")) ? "0 1px 3px rgba(0,0,0,0.35)" : "none",
