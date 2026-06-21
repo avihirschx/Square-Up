@@ -1,8 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import {
-  OUTER_CELLS, INNER_CELLS, SIDE_CELLS, CORNER_SIDES, GRID_CORNERS,
-  CELL_SIDE, CELL, GAP,
-} from "../engine/geometry.js";
+import { CELL, GAP } from "../engine/geometry.js";
 import {
   resolveSide, validateGrid, dealPuzzle,
 } from "../engine/engine.js";
@@ -13,14 +10,16 @@ import Tutorial from "./Tutorial.jsx";
 const MAX_ATTEMPTS = 4;
 const MAX_HINTS = 2;
 
-// Corner split gradients, oriented so each side's color sits on the edge that
-// faces that side's other tiles (colors flow continuously into the sides).
-const CORNER_GRAD = {
-  "0,0": (col) => `linear-gradient(45deg, ${col.left} 50%, ${col.top} 50%)`,
-  "0,3": (col) => `linear-gradient(135deg, ${col.top} 50%, ${col.right} 50%)`,
-  "3,0": (col) => `linear-gradient(135deg, ${col.left} 50%, ${col.bottom} 50%)`,
-  "3,3": (col) => `linear-gradient(45deg, ${col.bottom} 50%, ${col.right} 50%)`,
-};
+// Corner split gradient (any board size), oriented so each side's color sits on
+// the edge that faces its own side — keyed by which two sides the corner joins.
+function cornerGradient(geo, key, col) {
+  const sides = geo.CORNER_SIDES[key];
+  const has = (s) => sides.includes(s);
+  if (has("top") && has("left"))    return `linear-gradient(45deg, ${col.left} 50%, ${col.top} 50%)`;
+  if (has("top") && has("right"))   return `linear-gradient(135deg, ${col.top} 50%, ${col.right} 50%)`;
+  if (has("bottom") && has("left")) return `linear-gradient(135deg, ${col.left} 50%, ${col.bottom} 50%)`;
+  return `linear-gradient(45deg, ${col.bottom} 50%, ${col.right} 50%)`; // bottom + right
+}
 
 function shuffleArr(arr) {
   const a = [...arr];
@@ -39,7 +38,8 @@ const NAG_MESSAGES = [
 ];
 
 export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSave, onBack }) {
-  const { colors, fallbackGrid } = puzzle;
+  const { colors, fallbackGrid, geo } = puzzle;
+  const { N, OUTER_CELLS, INNER_CELLS, SIDE_CELLS, CORNER_SIDES, GRID_CORNERS, CELL_SIDE } = geo;
 
   const [grid, setGrid]                     = useState(() => dealPuzzle(puzzle));
   const [selected, setSelected]             = useState(null);
@@ -423,7 +423,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
       if (cA && cB) {
         // Both sides known → split, oriented so each color meets its side.
         const col = { [sA]: colors[cA].bg, [sB]: colors[cB].bg };
-        return { bg: null, gradient: CORNER_GRAD[key](col), textColor: "#fff", isCornerSplit: true, entering, delay };
+        return { bg: null, gradient: cornerGradient(geo, key, col), textColor: "#fff", isCornerSplit: true, entering, delay };
       }
       const solo = cA || cB;
       if (solo) {
@@ -474,6 +474,65 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
     fontSize: "15px", fontWeight: 800, letterSpacing: "0.3px", textTransform: "uppercase",
     color: sideLabelColor(side), transition: "color 0.4s",
   });
+
+  // The check + shuffle/reset (or the win/answer panel). Lives in the center
+  // hole for 4×4; rendered below the board for 3×3 (center holds the odd tile).
+  function renderControls() {
+    if (solved) {
+      return (
+        <div style={{
+          display: "flex", flexDirection: "column", alignItems: "center", gap: "5px",
+          animation: "victory-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both",
+        }}>
+          <div style={{ fontSize: "26px", lineHeight: 1 }}>🎉</div>
+          <div style={{ fontSize: "15px", fontWeight: 800, color: "#fff", letterSpacing: "-0.3px" }}>Squared up!</div>
+          <div style={{ fontSize: "10px", color: "#6f9f78", fontWeight: 600 }}>
+            {guesses === 1 ? "First try!" : `Solved in ${guesses}`}
+          </div>
+          <div style={{ display: "flex", gap: "7px", marginTop: "3px" }}>
+            <button onClick={onShare} style={sqShare}>Share</button>
+            <button onClick={onBack} style={sqMenu}>Menu</button>
+          </div>
+        </div>
+      );
+    }
+    if (revealed) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+          <div style={{ fontSize: "26px", lineHeight: 1 }}>😤</div>
+          <div style={{ fontSize: "13px", fontWeight: 800, color: "#dd6a6a" }}>Answer shown</div>
+          <div style={{ display: "flex", gap: "7px", marginTop: "3px" }}>
+            <button onClick={onShare} style={sqShare}>Share</button>
+            <button onClick={onBack} style={sqMenu}>Menu</button>
+          </div>
+        </div>
+      );
+    }
+    const clickable = !solving;
+    return (
+      <>
+        <button aria-label="Check" onClick={clickable ? checkSolution : undefined}
+          style={{
+            width: "150px", height: "42px", borderRadius: "10px", padding: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            background: "#1d3326", border: "1px solid #2f5d3b", color: "#6cc585",
+            cursor: clickable ? "pointer" : "default", opacity: clickable ? 1 : 0.5,
+            transition: "background 0.15s, border-color 0.15s, opacity 0.15s",
+          }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="5 12.5 10 17.5 19 7" />
+          </svg>
+        </button>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button onClick={shufflePuzzle} disabled={solving}
+            style={{ ...centerCtrl, cursor: solving ? "default" : "pointer", opacity: solving ? 0.4 : 1 }}>Shuffle</button>
+          <button onClick={resetPuzzle} disabled={solving}
+            style={{ ...centerCtrl, cursor: solving ? "default" : "pointer", opacity: solving ? 0.4 : 1 }}>Reset</button>
+        </div>
+      </>
+    );
+  }
 
   return (
     <div
@@ -612,77 +671,24 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
 
         <div style={{
           display: "grid",
-          gridTemplateColumns: `repeat(4,${CELL}px)`,
-          gridTemplateRows: `repeat(4,${CELL - 16}px)`,
+          gridTemplateColumns: `repeat(${N},${CELL}px)`,
+          gridTemplateRows: `repeat(${N},${CELL - 16}px)`,
           gap: `${GAP}px`,
           animation: shake ? "shake 0.45s ease" : "none",
         }}>
-          {Array.from({ length: 4 }, (_, r) =>
-            Array.from({ length: 4 }, (_, c) => {
-              if (INNER_CELLS.has(`${r},${c}`)) {
+          {Array.from({ length: N }, (_, r) =>
+            Array.from({ length: N }, (_, c) => {
+              // 4×4: the inner 2×2 is the controls hole. 3×3: the single inner
+              // cell is the odd-one-out tile (render it like any other tile).
+              if (N === 4 && INNER_CELLS.has(`${r},${c}`)) {
                 if (r === 1 && c === 1) {
-                  const clickable = !solved && !revealed && !solving;
                   return (
                     <div key="center" style={{
                       gridColumn: "2/4", gridRow: "2/4",
                       display: "flex", flexDirection: "column",
                       alignItems: "center", justifyContent: "center", gap: "9px",
                     }}>
-                      {solved ? (
-                        <div style={{
-                          display: "flex", flexDirection: "column", alignItems: "center", gap: "5px",
-                          animation: "victory-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both",
-                        }}>
-                          <div style={{ fontSize: "26px", lineHeight: 1 }}>🎉</div>
-                          <div style={{ fontSize: "15px", fontWeight: 800, color: "#fff", letterSpacing: "-0.3px" }}>Squared up!</div>
-                          <div style={{ fontSize: "10px", color: "#6f9f78", fontWeight: 600 }}>
-                            {guesses === 1 ? "First try!" : `Solved in ${guesses}`}
-                          </div>
-                          <div style={{ display: "flex", gap: "7px", marginTop: "3px" }}>
-                            <button onClick={onShare} style={sqShare}>Share</button>
-                            <button onClick={onBack} style={sqMenu}>Menu</button>
-                          </div>
-                        </div>
-                      ) : revealed ? (
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
-                          <div style={{ fontSize: "26px", lineHeight: 1 }}>😤</div>
-                          <div style={{ fontSize: "13px", fontWeight: 800, color: "#dd6a6a" }}>Answer shown</div>
-                          <div style={{ display: "flex", gap: "7px", marginTop: "3px" }}>
-                            <button onClick={onShare} style={sqShare}>Share</button>
-                            <button onClick={onBack} style={sqMenu}>Menu</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <button
-                            aria-label="Check"
-                            onClick={clickable ? checkSolution : undefined}
-                            style={{
-                              width: "150px", height: "42px", borderRadius: "10px", padding: 0,
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              background: "#1d3326", border: "1px solid #2f5d3b",
-                              color: "#6cc585",
-                              cursor: clickable ? "pointer" : "default",
-                              opacity: clickable ? 1 : 0.5,
-                              transition: "background 0.15s, border-color 0.15s, opacity 0.15s",
-                            }}>
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
-                              stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="5 12.5 10 17.5 19 7" />
-                            </svg>
-                          </button>
-                          <div style={{ display: "flex", gap: "8px" }}>
-                            <button onClick={shufflePuzzle} disabled={solving}
-                              style={{ ...centerCtrl, cursor: solving ? "default" : "pointer", opacity: solving ? 0.4 : 1 }}>
-                              Shuffle
-                            </button>
-                            <button onClick={resetPuzzle} disabled={solving}
-                              style={{ ...centerCtrl, cursor: solving ? "default" : "pointer", opacity: solving ? 0.4 : 1 }}>
-                              Reset
-                            </button>
-                          </div>
-                        </>
-                      )}
+                      {renderControls()}
                     </div>
                   );
                 }
@@ -766,6 +772,12 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
 
       </div>
       </div>
+
+      {N === 3 && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "9px", marginTop: "14px", marginBottom: "4px" }}>
+          {renderControls()}
+        </div>
+      )}
 
       <div style={{
         maxWidth: "400px", width: "100%", overflow: "hidden",

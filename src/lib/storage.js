@@ -1,4 +1,4 @@
-// "My Puzzles" — a per-device list of user-created puzzles, persisted in
+﻿// "My Puzzles" â€” a per-device list of user-created puzzles, persisted in
 // localStorage. (Sharing between people happens via the share link, which
 // carries the whole puzzle; see puzzleCodec.js.)
 
@@ -19,7 +19,7 @@ function writeAll(list) {
     localStorage.setItem(KEY, JSON.stringify(list));
     return true;
   } catch {
-    return false; // private mode / quota — caller can surface this
+    return false; // private mode / quota â€” caller can surface this
   }
 }
 
@@ -37,7 +37,8 @@ export function sourceSignature(source) {
   const names = ["top", "right", "bottom", "left"]
     .map((s) => (source.names[s] || "").trim().toLowerCase()).join("");
   const cells = (source.cells || []).map((w) => (w || "").trim().toLowerCase()).join("");
-  return names + "" + cells;
+  const extra = (source.mode || "4x4") + (source.odd || "").trim().toLowerCase();
+  return names + "_" + cells + "|" + extra;
 }
 
 export function findSaved(source) {
@@ -57,9 +58,11 @@ export function saveSource(source) {
   const list = readAll();
   const rec = {
     id: "u" + Math.random().toString(36).slice(2, 9),
+    mode: source.mode || "4x4",
     title: source.title || "Untitled puzzle",
     names: source.names,
     cells: source.cells,
+    odd: source.odd || null,
     createdAt: Date.now(),
   };
   list.unshift(rec);
@@ -72,7 +75,7 @@ export function updateSource(id, source) {
   const list = readAll();
   const i = list.findIndex((p) => p.id === id);
   if (i < 0) return saveSource(source);
-  list[i] = { ...list[i], title: source.title, names: source.names, cells: source.cells };
+  list[i] = { ...list[i], mode: source.mode || "4x4", title: source.title, names: source.names, cells: source.cells, odd: source.odd || null };
   return writeAll(list) ? list[i] : null;
 }
 

@@ -1,17 +1,33 @@
 import { useState } from "react";
-import { INNER_CELLS, GRID_CORNERS, CELL, GAP } from "../engine/geometry.js";
+import { geoForMode, CELL, GAP } from "../engine/geometry.js";
 import { parseSquareToPuzzle, gridToCells, sourceToGrid } from "../engine/builder.js";
 import { buildShareUrl } from "../lib/puzzleCodec.js";
 import { shareResult } from "../lib/share.js";
 
+const emptyGrid = (n) => Array(n).fill(null).map(() => Array(n).fill(""));
+
 export default function BuilderScreen({ onPlay, onSave, onBack, initial, editing }) {
+  const [mode, setMode] = useState(() => initial?.mode || "4x4");
   const [cells, setCells] = useState(() =>
-    initial ? sourceToGrid(initial) : Array(4).fill(null).map(() => Array(4).fill("")));
+    initial ? sourceToGrid(initial) : emptyGrid(geoForMode(initial?.mode || "4x4").N));
+  const [odd, setOdd] = useState(() => initial?.odd || "");
   const [names, setNames] = useState(() =>
     initial ? { ...initial.names } : { top: "", right: "", bottom: "", left: "" });
   const [title, setTitle] = useState(() => (initial ? initial.title : ""));
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
+
+  const geo = geoForMode(mode);
+  const N = geo.N;
+  const ROW_W = N * CELL + (N - 1) * GAP;
+
+  function switchMode(m) {
+    if (m === mode) return;
+    setMode(m);
+    setCells(emptyGrid(geoForMode(m).N));
+    setOdd("");
+    setError("");
+  }
 
   const setCell = (r, c, v) => {
     setCells((prev) => {
@@ -28,20 +44,20 @@ export default function BuilderScreen({ onPlay, onSave, onBack, initial, editing
     setTimeout(() => setToast(""), 2200);
   }
 
-  // Validate the square; on success returns { puzzle, source }, else shows the
-  // error and returns null.
   function validated({ requireTitle = false } = {}) {
-    const res = parseSquareToPuzzle(cells, names);
+    const res = parseSquareToPuzzle(cells, names, mode, odd);
     if (!res.ok) { setError(res.error); return null; }
     const cleanTitle = title.trim();
     if (requireTitle && !cleanTitle) { setError("Give your puzzle a name first."); return null; }
     const source = {
+      mode,
       title: cleanTitle || "Untitled puzzle",
       names: {
         top: names.top.trim(), right: names.right.trim(),
         bottom: names.bottom.trim(), left: names.left.trim(),
       },
-      cells: gridToCells(cells),
+      cells: gridToCells(cells, mode),
+      odd: mode === "3x3" ? odd.trim() : null,
     };
     return { puzzle: res.puzzle, source };
   }
@@ -64,16 +80,27 @@ export default function BuilderScreen({ onPlay, onSave, onBack, initial, editing
   }
 
   function loadExample() {
-    const ex = [
-      ["Swift", "Java", "Ruby", "Python"],
-      ["", "", "", "Adder"],
-      ["", "", "", "Mamba"],
-      ["Falcon", "Civic", "Beetle", "Viper"],
-    ];
-    ex[2][0] = "Wren"; ex[1][0] = "Finch";
-    setCells(ex.map((row) => [...row]));
-    setNames({ top: "Programming languages", right: "Snakes", bottom: "Car models", left: "Birds" });
-    setTitle("Founding Four");
+    if (mode === "3x3") {
+      setCells([
+        ["Swift", "Java", "Python"],
+        ["Wren", "", "Mamba"],
+        ["Falcon", "Civic", "Viper"],
+      ]);
+      setOdd("Cobra");
+      setNames({ top: "Programming languages", right: "Snakes", bottom: "Car models", left: "Birds" });
+      setTitle("Slither Square");
+    } else {
+      const ex = [
+        ["Swift", "Java", "Ruby", "Python"],
+        ["", "", "", "Adder"],
+        ["", "", "", "Mamba"],
+        ["Falcon", "Civic", "Beetle", "Viper"],
+      ];
+      ex[2][0] = "Wren"; ex[1][0] = "Finch";
+      setCells(ex.map((row) => [...row]));
+      setNames({ top: "Programming languages", right: "Snakes", bottom: "Car models", left: "Birds" });
+      setTitle("Founding Four");
+    }
     setError("");
   }
 
@@ -84,11 +111,17 @@ export default function BuilderScreen({ onPlay, onSave, onBack, initial, editing
     padding: "2px", outline: "none",
   };
   const cornerStyle = { ...inputStyle, border: "1px solid #4a4a70", background: "#20203a" };
+  const oddStyle = { ...inputStyle, border: "1px dashed #b8862b", background: "#241d10", color: "#e8b54a" };
   const nameInput = {
     background: "#15151f", border: "1px solid #2c2c40", borderRadius: "8px",
     color: "#eee", fontSize: "12px", fontWeight: 700, padding: "6px 8px", outline: "none",
     textAlign: "center",
   };
+  const modeBtn = (on) => ({
+    padding: "8px 14px", borderRadius: "9px", fontSize: "13px", fontWeight: 800, cursor: "pointer",
+    background: on ? "#2A7AE4" : "#16161f", color: on ? "#fff" : "#9aa",
+    border: on ? "none" : "1px solid #2c2c40",
+  });
 
   return (
     <div style={{
@@ -97,20 +130,29 @@ export default function BuilderScreen({ onPlay, onSave, onBack, initial, editing
       padding: "22px 16px 48px",
       fontFamily: "'Segoe UI',system-ui,sans-serif", color: "#f0f0f0",
     }}>
-      <div style={{ width: `${4 * CELL + 3 * GAP + 80}px`, maxWidth: "100%", display: "flex", justifyContent: "flex-start", marginBottom: "6px" }}>
+      <div style={{ width: `${ROW_W + 80}px`, maxWidth: "100%", display: "flex", justifyContent: "flex-start", marginBottom: "6px" }}>
         <button onClick={onBack} style={{
           background: "none", border: "1px solid #252535", borderRadius: "6px",
           color: "#888", fontSize: "12px", padding: "5px 12px", cursor: "pointer",
         }}>← Menu</button>
       </div>
 
-      <h1 style={{ fontSize: "26px", fontWeight: 800, letterSpacing: "-0.5px", margin: "0 0 2px" }}>
+      <h1 style={{ fontSize: "26px", fontWeight: 800, letterSpacing: "-0.5px", margin: "0 0 8px" }}>
         {editing ? "Edit puzzle" : "Build a puzzle"}
       </h1>
+
+      <div style={{ display: "flex", gap: "8px", marginBottom: "10px" }}>
+        <button onClick={() => switchMode("4x4")} style={modeBtn(mode === "4x4")}>Classic 4×4</button>
+        <button onClick={() => switchMode("3x3")} style={modeBtn(mode === "3x3")}>Odd one out 3×3</button>
+      </div>
+
       <p style={{ color: "#666", fontSize: "13px", margin: "0 0 4px", textAlign: "center", maxWidth: "440px" }}>
         Fill the square. Each <strong>side</strong> is one category (name it on that edge).
-        The four <strong>corner</strong> tiles are shared by the two sides they touch — so a
-        corner word must belong to <em>both</em> neighboring categories.
+        The four <strong>corner</strong> tiles are shared by the two sides they touch.
+        {mode === "3x3" && (
+          <> The <strong style={{ color: "#e8b54a" }}>center</strong> tile is the <em>odd one out</em> — a
+            word that belongs to no category.</>
+        )}
       </p>
       <button onClick={loadExample} style={{
         background: "none", border: "1px solid #252535", borderRadius: "6px",
@@ -119,11 +161,11 @@ export default function BuilderScreen({ onPlay, onSave, onBack, initial, editing
 
       <input value={title} onChange={(e) => { setTitle(e.target.value); setError(""); }}
         placeholder="Puzzle name (e.g. “Jacob’s Square”)"
-        style={{ ...nameInput, width: `${4 * CELL + 3 * GAP}px`, marginBottom: "16px", fontSize: "13px" }} />
+        style={{ ...nameInput, width: `${ROW_W}px`, marginBottom: "16px", fontSize: "13px" }} />
 
       <input value={names.top} onChange={(e) => setName("top", e.target.value)}
         placeholder="Top"
-        style={{ ...nameInput, width: `${4 * CELL + 3 * GAP}px`, marginBottom: "6px" }} />
+        style={{ ...nameInput, width: `${ROW_W}px`, marginBottom: "6px" }} />
 
       <div style={{ display: "flex", alignItems: "stretch", gap: "6px" }}>
         <textarea value={names.left} onChange={(e) => setName("left", e.target.value)}
@@ -133,29 +175,37 @@ export default function BuilderScreen({ onPlay, onSave, onBack, initial, editing
 
         <div style={{
           display: "grid",
-          gridTemplateColumns: `repeat(4,${CELL}px)`,
-          gridTemplateRows: `repeat(4,${CELL - 16}px)`,
+          gridTemplateColumns: `repeat(${N},${CELL}px)`,
+          gridTemplateRows: `repeat(${N},${CELL - 16}px)`,
           gap: `${GAP}px`,
         }}>
-          {Array.from({ length: 4 }, (_, r) =>
-            Array.from({ length: 4 }, (_, c) => {
+          {Array.from({ length: N }, (_, r) =>
+            Array.from({ length: N }, (_, c) => {
               const key = `${r},${c}`;
-              if (INNER_CELLS.has(key)) {
-                if (r === 1 && c === 1) {
-                  return (
-                    <div key="mid" style={{
-                      gridColumn: "2/4", gridRow: "2/4", borderRadius: "12px",
-                      border: "1px dashed #2c2c40", display: "flex",
-                      alignItems: "center", justifyContent: "center",
-                      color: "#3a3a4a", fontSize: "11px", textAlign: "center", padding: "6px",
-                    }}>
-                      sides = categories<br />corners = shared
-                    </div>
-                  );
+              if (geo.INNER_CELLS.has(key)) {
+                if (N === 4) {
+                  if (r === 1 && c === 1) {
+                    return (
+                      <div key="mid" style={{
+                        gridColumn: "2/4", gridRow: "2/4", borderRadius: "12px",
+                        border: "1px dashed #2c2c40", display: "flex",
+                        alignItems: "center", justifyContent: "center",
+                        color: "#3a3a4a", fontSize: "11px", textAlign: "center", padding: "6px",
+                      }}>
+                        sides = categories<br />corners = shared
+                      </div>
+                    );
+                  }
+                  return null;
                 }
-                return null;
+                // 3×3 center: the odd-one-out word.
+                return (
+                  <input key="odd" value={odd}
+                    onChange={(e) => { setOdd(e.target.value); setError(""); }}
+                    placeholder="odd one out" style={oddStyle} />
+                );
               }
-              const isCorner = GRID_CORNERS.has(key);
+              const isCorner = geo.GRID_CORNERS.has(key);
               return (
                 <input
                   key={key}
@@ -177,7 +227,7 @@ export default function BuilderScreen({ onPlay, onSave, onBack, initial, editing
 
       <input value={names.bottom} onChange={(e) => setName("bottom", e.target.value)}
         placeholder="Bottom"
-        style={{ ...nameInput, width: `${4 * CELL + 3 * GAP}px`, marginTop: "6px" }} />
+        style={{ ...nameInput, width: `${ROW_W}px`, marginTop: "6px" }} />
 
       {error && (
         <div style={{
@@ -212,8 +262,11 @@ export default function BuilderScreen({ onPlay, onSave, onBack, initial, editing
       </div>
 
       <p style={{ color: "#444", fontSize: "11px", marginTop: "8px", maxWidth: "420px", textAlign: "center", lineHeight: 1.6 }}>
-        Tip: the corner tiles (highlighted) are shared by the two sides they touch — the
-        top-right corner belongs to both the top and right categories.
+        {mode === "3x3"
+          ? <>Tip: pick a <strong style={{ color: "#7a6a3a" }}>deceptive</strong> odd-one-out — a word that looks
+              like it could fit a category but doesn’t. The solver has to spot it.</>
+          : <>Tip: the corner tiles (highlighted) are shared by the two sides they touch — the
+              top-right corner belongs to both the top and right categories.</>}
         <br /><strong>Save</strong> keeps it in “My Puzzles” on this device. <strong>Copy share
         link</strong> makes a link that contains the whole puzzle — anyone who opens it can play.
       </p>

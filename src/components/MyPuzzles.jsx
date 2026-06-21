@@ -34,7 +34,7 @@ export default function MyPuzzles({ onPlay, onEdit, onBuild, onBack }) {
   }
 
   async function copyLink(rec) {
-    const url = buildShareUrl({ title: rec.title, names: rec.names, cells: rec.cells });
+    const url = buildShareUrl(rec);
     const r = await shareResult(url);
     flashToast(r === "failed" ? "Couldn't copy link" : r === "shared" ? "Link shared!" : "Link copied!");
   }
@@ -91,8 +91,14 @@ export default function MyPuzzles({ onPlay, onEdit, onBuild, onBack }) {
             }}>
               <Swatch />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 800, fontSize: "15px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {rec.title}
+                <div style={{ fontWeight: 800, fontSize: "15px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{rec.title}</span>
+                  {rec.mode === "3x3" && (
+                    <span style={{ flexShrink: 0, fontSize: "10px", fontWeight: 800, color: "#e8b54a",
+                      background: "#241d10", border: "1px solid #4a3a18", borderRadius: "999px", padding: "1px 7px" }}>
+                      odd one out
+                    </span>
+                  )}
                 </div>
                 <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
                   <button onClick={() => onPlay(rec)} style={{ ...smallBtn, background: "#1c2e1c", borderColor: "#2a4a2a", color: "#bfe6bf" }}>▶ Play</button>
