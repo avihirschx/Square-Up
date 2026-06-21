@@ -1,17 +1,15 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Pure puzzle engine — no React, no DOM. Everything the game needs to
-// derive, validate, solve, and shuffle a puzzle lives here so it can be
-// unit-tested and run from Node (see scripts/validate-puzzles.mjs).
+// Pure puzzle engine — no React, no DOM. Geometry-aware: works for the classic
+// 4×4 board and the 3×3 "odd one out" board. Each puzzle carries its own
+// geometry (puzzle.geo) so all the helpers stay size-agnostic.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-import {
-  OUTER_CELLS, GRID_CORNERS, SIDE_CELLS, SIDE_CORNERS,
-  SIDE_PAIR_CORNER, CELL_SIDE,
-} from "./geometry.js";
+import { geoForMode } from "./geometry.js";
 
-// Turn a puzzle config { edgeWords, corners, colors } into all the
-// derived lookup data the board needs.
-export function derivePuzzle({ edgeWords, corners, colors }) {
+// Turn a puzzle config into all the derived lookup data the board needs.
+// mode: "4x4" (classic) | "3x3" (odd one out). odd: the extra center word (3x3).
+export function derivePuzzle({ edgeWords, corners, colors, mode = "4x4", odd = null }) {
+  const geo = geoForMode(mode);
   const catNames = Object.keys(edgeWords);
 
   const cornerWordColors = {};
@@ -40,18 +38,24 @@ export function derivePuzzle({ edgeWords, corners, colors }) {
   for (const cat of catNames)
     catSorted[cat] = [...categoryWords[cat]].sort().join(",");
 
-  const fallbackGrid = buildSolvedGrid(catNames, corners, categoryWords);
+  // Cells the player fills, and the words that go in them. In 3×3 mode the
+  // center cell holds the odd-one-out word; in 4×4 the center is the UI.
+  const useOdd = mode === "3x3" && !!odd;
+  const placeCells = useOdd ? [...geo.OUTER_CELLS, ...geo.CENTER_CELLS] : geo.OUTER_CELLS;
+  const allWords = useOdd ? [...words, odd] : words;
+
+  const fallbackGrid = buildSolvedGrid(geo, catNames, corners, categoryWords, useOdd ? odd : null);
 
   return {
+    geo, mode, odd: useOdd ? odd : null,
     edgeWords, corners, colors, catNames,
     cornerWordColors, categoryWords, categoryCornerWords,
-    words, validAdjacent, catSorted, fallbackGrid,
+    words, allWords, placeCells, validAdjacent, catSorted, fallbackGrid,
   };
 }
 
-// Build ONE valid solved 4×4 grid for a puzzle (used for the
-// reveal-on-give-up, and as a structural-validity proof by the validator).
-export function buildSolvedGrid(catNames, corners, categoryWords) {
+// Build ONE valid solved grid (reveal-on-give-up + structural-validity proof).
+export function buildSolvedGrid(geo, catNames, corners, categoryWords, odd) {
   const sharedBetween = (a, b) =>
     corners.find((c) => c.cats.includes(a) && c.cats.includes(b))?.word ?? null;
 
@@ -65,39 +69,46 @@ export function buildSolvedGrid(catNames, corners, categoryWords) {
   if (ring.length < 4) return null;
 
   const [topCat, rightCat, bottomCat, leftCat] = ring;
-  const cornerTR = sharedBetween(topCat, rightCat);
-  const cornerBR = sharedBetween(rightCat, bottomCat);
-  const cornerBL = sharedBetween(bottomCat, leftCat);
-  const cornerTL = sharedBetween(leftCat, topCat);
-  if (!cornerTR || !cornerBR || !cornerBL || !cornerTL) return null;
+  const sideCat = { top: topCat, right: rightCat, bottom: bottomCat, left: leftCat };
+  const cornerByPair = {
+    "top+right": sharedBetween(topCat, rightCat),
+    "right+bottom": sharedBetween(rightCat, bottomCat),
+    "bottom+left": sharedBetween(bottomCat, leftCat),
+    "left+top": sharedBetween(leftCat, topCat),
+  };
+  if (Object.values(cornerByPair).some((w) => !w)) return null;
+  const allCorners = Object.values(cornerByPair);
 
-  const edgeOnly = (cat) =>
-    categoryWords[cat].filter((w) => ![cornerTR, cornerBR, cornerBL, cornerTL].includes(w));
-  const [t1, t2] = edgeOnly(topCat);
-  const [r1, r2] = edgeOnly(rightCat);
-  const [b1, b2] = edgeOnly(bottomCat);
-  const [l1, l2] = edgeOnly(leftCat);
-  // A well-formed puzzle has exactly 2 edge-only words per side.
-  if ([t1, t2, r1, r2, b1, b2, l1, l2].some((w) => w === undefined)) return null;
+  const g = Array(geo.N).fill(null).map(() => Array(geo.N).fill(null));
 
-  const g = Array(4).fill(null).map(() => Array(4).fill(null));
-  g[0][0] = cornerTL; g[0][1] = t1; g[0][2] = t2; g[0][3] = cornerTR;
-  g[1][3] = r1;       g[2][3] = r2; g[3][3] = cornerBR;
-  g[3][2] = b1;       g[3][1] = b2; g[3][0] = cornerBL;
-  g[2][0] = l1;       g[1][0] = l2;
+  for (const [pair, word] of Object.entries(cornerByPair)) {
+    const [r, c] = geo.SIDE_PAIR_CORNER[pair].split(",").map(Number);
+    g[r][c] = word;
+  }
+  for (const side of ["top", "right", "bottom", "left"]) {
+    const edges = categoryWords[sideCat[side]].filter((w) => !allCorners.includes(w));
+    const cornerKeys = new Set(geo.SIDE_CORNERS[side]);
+    const edgeCells = geo.SIDE_CELLS[side].filter(([r, c]) => !cornerKeys.has(`${r},${c}`));
+    if (edges.length !== edgeCells.length) return null; // malformed
+    edgeCells.forEach(([r, c], i) => { g[r][c] = edges[i]; });
+  }
+  if (odd && geo.CENTER_CELLS.length === 1) {
+    const [r, c] = geo.CENTER_CELLS[0];
+    g[r][c] = odd;
+  }
   return g;
 }
 
-// ── Runtime engine functions (all take `puzzle`) ──
+// ── Runtime engine functions (all take `puzzle`, which carries geo) ──
 
-export function isLockedEdge(key, correctSideMap) {
+export function isLockedEdge(geo, key, correctSideMap) {
   if (!correctSideMap?.size) return false;
-  if (GRID_CORNERS.has(key)) return false;
-  return correctSideMap.has(CELL_SIDE[key]);
+  if (geo.GRID_CORNERS.has(key)) return false;
+  return correctSideMap.has(geo.CELL_SIDE[key]);
 }
 
 export function resolveSide(puzzle, grid, side) {
-  const words = SIDE_CELLS[side].map(([r, c]) => grid[r][c]);
+  const words = puzzle.geo.SIDE_CELLS[side].map(([r, c]) => grid[r][c]);
   if (words.some((w) => !w)) return null;
   const sorted = [...words].sort().join(",");
   return puzzle.catNames.find((cat) => puzzle.catSorted[cat] === sorted) ?? null;
@@ -108,8 +119,9 @@ export function sharedWord(puzzle, catA, catB) {
 }
 
 export function validateGrid(puzzle, grid) {
+  const geo = puzzle.geo;
   const sideCat = {};
-  for (const side of Object.keys(SIDE_CELLS)) {
+  for (const side of Object.keys(geo.SIDE_CELLS)) {
     const cat = resolveSide(puzzle, grid, side);
     if (!cat) return null;
     sideCat[side] = cat;
@@ -120,21 +132,21 @@ export function validateGrid(puzzle, grid) {
     const [c1, c2] = [sideCat[s1], sideCat[s2]];
     if (!puzzle.validAdjacent[`${c1}+${c2}`]) return null;
     const sw = sharedWord(puzzle, c1, c2);
-    const [cr, co] = SIDE_PAIR_CORNER[`${s1}+${s2}`].split(",").map(Number);
+    const [cr, co] = geo.SIDE_PAIR_CORNER[`${s1}+${s2}`].split(",").map(Number);
     if (grid[cr][co] !== sw) return null;
   }
   return { sideCategories: sideCat };
 }
 
-// Which sides are fully correct (right category set AND right corner words),
-// so the board can lock them in as a hint.
+// Which sides are fully correct (right category set AND right corner words).
 export function getCorrectSideMap(puzzle, grid) {
+  const geo = puzzle.geo;
   const result = new Map();
-  for (const side of Object.keys(SIDE_CELLS)) {
+  for (const side of Object.keys(geo.SIDE_CELLS)) {
     const cat = resolveSide(puzzle, grid, side);
     if (!cat) continue;
     const cw = puzzle.categoryCornerWords[cat];
-    const ok = SIDE_CORNERS[side].every((key) => {
+    const ok = geo.SIDE_CORNERS[side].every((key) => {
       const [r, c] = key.split(",").map(Number);
       return cw.includes(grid[r][c]);
     });
@@ -153,24 +165,23 @@ function shuffled(arr) {
   return a;
 }
 
-export function shuffleIntoGrid(words) {
-  const g = Array(4).fill(null).map(() => Array(4).fill(null));
-  OUTER_CELLS.forEach(([r, c], i) => { g[r][c] = words[i]; });
+export function placeIntoGrid(puzzle, words) {
+  const g = Array(puzzle.geo.N).fill(null).map(() => Array(puzzle.geo.N).fill(null));
+  puzzle.placeCells.forEach(([r, c], i) => { g[r][c] = words[i]; });
   return g;
 }
 
-// Shuffle the 12 words into the board, avoiding the (rare) case where the
-// initial deal is already a valid solution.
+// Shuffle the words into the board, avoiding the (rare) already-solved deal.
 export function dealPuzzle(puzzle) {
-  let grid = shuffleIntoGrid(shuffled(puzzle.words));
+  let grid = placeIntoGrid(puzzle, shuffled(puzzle.allWords));
   for (let tries = 0; tries < 20 && validateGrid(puzzle, grid); tries++) {
-    grid = shuffleIntoGrid(shuffled(puzzle.words));
+    grid = placeIntoGrid(puzzle, shuffled(puzzle.allWords));
   }
   return grid;
 }
 
-export function shuffleKeepingLocked(grid, lockedKeys) {
-  const freeKeys = OUTER_CELLS
+export function shuffleKeepingLocked(puzzle, grid, lockedKeys) {
+  const freeKeys = puzzle.placeCells
     .map(([r, c]) => `${r},${c}`)
     .filter((key) => !lockedKeys.has(key));
   const freeWords = shuffled(freeKeys.map((key) => {

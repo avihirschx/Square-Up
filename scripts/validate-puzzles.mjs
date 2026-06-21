@@ -16,7 +16,7 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import { OUTER_CELLS, SIDE_CELLS } from "../src/engine/geometry.js";
-import { validateGrid, shuffleIntoGrid } from "../src/engine/engine.js";
+import { validateGrid } from "../src/engine/engine.js";
 import { PUZZLES } from "../src/data/collection.js";
 
 const C = {
