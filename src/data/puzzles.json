@@ -1,0 +1,25 @@
+[
+  {
+    "title": "A Fun Puzzle",
+    "names": {
+      "top": "One Fish, Two Fish, Red Fish, Blue Fish",
+      "right": "Rhymes With Fun",
+      "bottom": "Precedes \"Day\"",
+      "left": "Types of Tea"
+    },
+    "cells": [
+      "Red",
+      "Two",
+      "Blue",
+      "One",
+      "Shotgun",
+      "None",
+      "Sun",
+      "May",
+      "D",
+      "Green",
+      "Black",
+      "White"
+    ]
+  }
+]

@@ -1,8 +1,7 @@
-// Picks a featured puzzle from PUZZLES based on the current date at midnight in America/New_York.
-// Falls back to a sensible default if the list is empty.
-import { PUZZLES } from "./collection.js";
-
-function getNewYorkDayIndex(now = new Date()) {
+// Picks a featured puzzle from puzzles.json based on the current date at midnight in America/New_York.
+// Falls back to the first built-in puzzle if the list is empty.
+import puzzles from "./puzzles.json";
+nfunction getNewYorkDayIndex(now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
     year: "numeric",
@@ -15,8 +14,7 @@ function getNewYorkDayIndex(now = new Date()) {
 n  const utcMidnightMs = Date.UTC(year, month - 1, day);
   return Math.floor(utcMidnightMs / 86400000);
 }
-
-const dayIndex = getNewYorkDayIndex();
-export const FEATURED_SOURCE = (PUZZLES && PUZZLES.length)
-  ? PUZZLES[dayIndex % PUZZLES.length]
+nconst dayIndex = getNewYorkDayIndex();
+export const FEATURED_SOURCE = (puzzles && puzzles.length)
+  ? puzzles[dayIndex % puzzles.length]
   : { title: "", names: {}, cells: [] };
