@@ -52,4 +52,16 @@ try {
 } catch { /* validate.js not on this branch; skip */ }
 console.log("");
 console.log("-- JSON Output --")
-console.log(JSON.stringify(src, null, 2) + ";");
+
+const pretty = JSON.stringify(src, null, 2);
+
+// find the cells array in the original object (safe re-serialization)
+const cellsInline = `"cells": ${JSON.stringify(src.cells)}`;
+
+// replace the multiline version of cells
+const out = pretty.replace(
+  /"cells": \[\s*[\s\S]*?\s*\]/,
+  cellsInline
+);
+
+console.log(out);
