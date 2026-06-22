@@ -1,33 +1,22 @@
-// The featured puzzle, shown by default when you open the base URL.
-//
-// Stored as a "source" (the same shape a saved/shared puzzle uses): the 12
-// outer words in geometry.OUTER_CELLS order + the four side category names.
-// To change the featured puzzle, build one, hit "Copy share link", and decode
-// it with `node scripts/decode-link.mjs <link>` — then paste the fields here.
-//
-// title is optional: leave it "" and the play screen just shows "Square Up".
-// An easy, everyday-words puzzle makes a friendlier first impression.
+// Picks a featured puzzle from PUZZLES based on the current date at midnight in America/New_York.
+// Falls back to a sensible default if the list is empty.
+import { PUZZLES } from "./collection.js";
 
-export const FEATURED_SOURCE = {
-   "title":"A Fun Puzzle",
-   "names":{
-      "top":"One Fish, Two Fish, Red Fish, Blue Fish",
-      "right":"Rhymes With Fun",
-      "bottom":"Precedes \"Day\"",
-      "left":"Types of Tea"
-   },
-   "cells":[
-      "Red",
-      "Two",
-      "Blue",
-      "One",
-      "Shotgun",
-      "None",
-      "Sun",
-      "May",
-      "D",
-      "Green",
-      "Black",
-      "White"
-   ]
+function getNewYorkDayIndex(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(now);
+n  const year = Number(parts.find(p => p.type === "year").value);
+  const month = Number(parts.find(p => p.type === "month").value);
+  const day = Number(parts.find(p => p.type === "day").value);
+n  const utcMidnightMs = Date.UTC(year, month - 1, day);
+  return Math.floor(utcMidnightMs / 86400000);
 }
+
+const dayIndex = getNewYorkDayIndex();
+export const FEATURED_SOURCE = (PUZZLES && PUZZLES.length)
+  ? PUZZLES[dayIndex % PUZZLES.length]
+  : { title: "", names: {}, cells: [] };
