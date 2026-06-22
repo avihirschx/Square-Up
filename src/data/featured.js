@@ -1,7 +1,8 @@
 // Picks a featured puzzle from puzzles.json based on the current date at midnight in America/New_York.
 // Falls back to the first built-in puzzle if the list is empty.
 import puzzles from "./puzzles.json";
-function getNewYorkDayIndex(now = new Date()) {
+
+function getNewYorkDayIndex(now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
     year: "numeric",
