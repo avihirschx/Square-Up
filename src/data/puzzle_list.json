@@ -1,0 +1,122 @@
+[
+  {
+    "title": "Cube's Square",
+    "names": {
+      "top": "Things in a bedroom",
+      "right": "Work__",
+      "bottom": "Parts of a Novel",
+      "left": "Encompass"
+    },
+    "cells": ["Blanket","Pillow","Duvet","Sheet","Around","Flow","Book","Spine","Title","Cover","Surround","Envelop"]
+  },
+  {
+    "title": "A Fun Puzzle",
+    "names": {
+      "top": "One Fish, Two Fish, Red Fish, Blue Fish",
+      "right": "Rhymes With Fun",
+      "bottom": "Precedes \"Day\"",
+      "left": "Types of Tea"
+    },
+    "cells": ["Red","Two","Blue","One","Shotgun","None","Sun","May","D","Green","Black","White"]
+  },
+  {
+    "title": "You're a Wizard",
+    "names": {
+      "top": "Singular Cereals",
+      "right": "Precedes \"piece\"",
+      "bottom": "Expert",
+      "left": "Ranks in a Deck of Cards"
+    },
+    "cells": ["jack","pop","loop","puff","conversation","hit","master","pro","wizard","ace","queen","six"]
+  },
+  {
+    "title": "Two by Four",
+    "names": {
+      "top": "State abbreviations",
+      "right": "Personal Pronouns",
+      "bottom": "Elements on the Periodic Table",
+      "left": "Solfege"
+    },
+    "cells": ["MI","NY","OK","ME","WE","US","HE","NA","FE","TI","DO","RE"]
+  },
+  {
+    "title": "Tricky",
+    "names": {
+      "top": "Contronyms",
+      "right": "Metalworking Processes",
+      "bottom": "Out __",
+      "left": "Things that make you Sneeze"
+    },
+    "cells": ["Dust","Left","Weather","Temper","Polish","Hammer","Cast","Back","Loud","Cold","Pollen","Itch"]
+  },
+  {
+    "title": "Hey it's your birthday",
+    "names": {
+      "top": "Has Wings",
+      "right": "Words Preceding Colors",
+      "bottom": "Gemstones",
+      "left": "At a Baseball Game"
+    },
+    "cells": ["Bat","White House","Butterfly","Raven","Forest","Snow","Ruby","Aquamarine","Opal","Diamond","Field","Home"]
+  },
+  {
+    "title": "Jacob is on a roll",
+    "names": {
+      "top": "Things that come in pairs",
+      "right": "Words for hitting someone",
+      "bottom": "Bowling Terms",
+      "left": "Thanksgiving dishes"
+    },
+    "cells": ["Pea","Chopstick","Ski","Sock","Hit","Punch","Strike","Gutter","Spare","Turkey","Cranberry","Potato"]
+  },
+  {
+    "title": "Avi's Puzzle",
+    "names": {
+      "top": "Peppers",
+      "right": "Temperatures",
+      "bottom": "Bath___",
+      "left": "Often Haunted"
+    },
+    "cells": ["Ghost","Bell","Dr.","Hot","Cool","Ambient","Room","Robe","House","Water","Rock","Dark"]
+  },
+  {
+    "title": "Thinking caps on",
+    "names": {
+      "top": "Airlines",
+      "right": "Greek letters",
+      "bottom": "Types of Rays",
+      "left": "Things found on a Treasure Map"
+    },
+    "cells": ["Southwest","United","Spirit","Delta","Beta","Alpha","Gamma","Sting","Ultraviolet","X","Treasure Chest","Dotted Line"]
+  },
+  {
+    "title": "",
+    "names": {
+      "top": "_Berry",
+      "right": "Has Feathers",
+      "bottom": "Stick-shaped",
+      "left": "Used to Start a Fire"
+    },
+    "cells": ["Straw","Elder","Blue","Goose","Chicken","Pillow","Arrow","Cue","Thermometer","Match","Newspaper","Birch"]
+  },
+  {
+    "title": "A walk in the park",
+    "names": {
+      "top": "On a calculator",
+      "right": "Beach activities",
+      "bottom": "To peruse",
+      "left": "Tree Parts"
+    },
+    "cells": ["Log","Times","Plus","Tan","Nap","Read","Surf","Skim","Scan","Leaf","Bud","Stump"]
+  },
+  {
+    "title": "What are the connections?",
+    "names": {
+      "top": "Milk types",
+      "right": "Animal without first letter",
+      "bottom": "Body parts that come in pairs",
+      "left": "Peruse"
+    },
+    "cells": ["Skim","Coconut","Whole","Oat","Ow","Ion","Ear","Calf","Eye","Thumb","Flip","Leaf"]
+  }
+]

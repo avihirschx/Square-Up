@@ -100,7 +100,7 @@ path, so it works at any repo URL without configuration.
 
 ## Colophon
 
-Original game concept by **Jacob Elspas**. Designed and built by
+Original game concept by [@Jacob Elspas](https://github.com/just-jay). Designed and built by
 [@avihirschx](https://github.com/avihirschx), with
 [Claude](https://claude.com/claude-code) as a pair-programming assistant.
 
