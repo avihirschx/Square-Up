@@ -51,3 +51,5 @@ try {
   }
 } catch { /* validate.js not on this branch; skip */ }
 console.log("");
+console.log("-- JSON Output --")
+console.log(JSON.stringify(src, null, 2) + ";");

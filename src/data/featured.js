@@ -9,17 +9,25 @@
 // An easy, everyday-words puzzle makes a friendlier first impression.
 
 export const FEATURED_SOURCE = {
-  title: "",
-  names: {
-    top: "Types of Awards",
-    right: "Sewing materials",
-    bottom: "Pointy items",
-    left: "Found on a table",
-  },
-  cells: [
-    "Cup", "Medal", "Statue", "Ribbon",   // top row
-    "Lace", "Thread",                       // right edge
-    "Needle", "Cactus", "Trident", "Fork",  // bottom row (BR→BL)
-    "Plate", "Glass",                       // left edge (BL→TL)
-  ],
-};
+   "title":"A Fun Puzzle",
+   "names":{
+      "top":"One Fish, Two Fish, Red Fish, Blue Fish",
+      "right":"Rhymes With Fun",
+      "bottom":"Precedes \"Day\"",
+      "left":"Types of Tea"
+   },
+   "cells":[
+      "Red",
+      "Two",
+      "Blue",
+      "One",
+      "Shotgun",
+      "None",
+      "Sun",
+      "May",
+      "D",
+      "Green",
+      "Black",
+      "White"
+   ]
+}
