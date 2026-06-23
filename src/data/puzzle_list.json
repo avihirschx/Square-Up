@@ -29,6 +29,28 @@
     },
     "cells": ["jack","pop","loop","puff","conversation","hit","master","pro","wizard","ace","queen","six"]
   },
+
+  {
+    "title": "What are the connections?",
+    "names": {
+      "top": "Milk types",
+      "right": "Animal without first letter",
+      "bottom": "Body parts that come in pairs",
+      "left": "Peruse"
+    },
+    "cells": ["Skim","Coconut","Whole","Oat","Ow","Ion","Ear","Calf","Eye","Thumb","Flip","Leaf"]
+  },
+  {
+    "title": "Avi's Puzzle",
+    "names": {
+      "top": "Peppers",
+      "right": "Temperatures",
+      "bottom": "Bath___",
+      "left": "Often Haunted"
+    },
+    "cells": ["Ghost","Bell","Dr.","Hot","Cool","Ambient","Room","Robe","House","Water","Rock","Dark"]
+  },
+  
   {
     "title": "Two by Four",
     "names": {
@@ -70,16 +92,6 @@
     "cells": ["Pea","Chopstick","Ski","Sock","Hit","Punch","Strike","Gutter","Spare","Turkey","Cranberry","Potato"]
   },
   {
-    "title": "Avi's Puzzle",
-    "names": {
-      "top": "Peppers",
-      "right": "Temperatures",
-      "bottom": "Bath___",
-      "left": "Often Haunted"
-    },
-    "cells": ["Ghost","Bell","Dr.","Hot","Cool","Ambient","Room","Robe","House","Water","Rock","Dark"]
-  },
-  {
     "title": "Thinking caps on",
     "names": {
       "top": "Airlines",
@@ -108,15 +120,5 @@
       "left": "Tree Parts"
     },
     "cells": ["Log","Times","Plus","Tan","Nap","Read","Surf","Skim","Scan","Leaf","Bud","Stump"]
-  },
-  {
-    "title": "What are the connections?",
-    "names": {
-      "top": "Milk types",
-      "right": "Animal without first letter",
-      "bottom": "Body parts that come in pairs",
-      "left": "Peruse"
-    },
-    "cells": ["Skim","Coconut","Whole","Oat","Ow","Ion","Ear","Calf","Eye","Thumb","Flip","Leaf"]
   }
 ]
