@@ -29,17 +29,6 @@
     },
     "cells": ["jack","pop","loop","puff","conversation","hit","master","pro","wizard","ace","queen","six"]
   },
-
-  {
-    "title": "What are the connections?",
-    "names": {
-      "top": "Milk types",
-      "right": "Animal without first letter",
-      "bottom": "Body parts that come in pairs",
-      "left": "Peruse"
-    },
-    "cells": ["Skim","Coconut","Whole","Oat","Ow","Ion","Ear","Calf","Eye","Thumb","Flip","Leaf"]
-  },
   {
     "title": "Avi's Puzzle",
     "names": {
@@ -50,7 +39,6 @@
     },
     "cells": ["Ghost","Bell","Dr.","Hot","Cool","Ambient","Room","Robe","House","Water","Rock","Dark"]
   },
-  
   {
     "title": "Two by Four",
     "names": {
@@ -100,6 +88,16 @@
       "left": "Things found on a Treasure Map"
     },
     "cells": ["Southwest","United","Spirit","Delta","Beta","Alpha","Gamma","Sting","Ultraviolet","X","Treasure Chest","Dotted Line"]
+  },
+  {
+    "title": "What are the connections?",
+    "names": {
+      "top": "Milk types",
+      "right": "Animal without first letter",
+      "bottom": "Body parts that come in pairs",
+      "left": "Peruse"
+    },
+    "cells": ["Skim","Coconut","Whole","Oat","Ow","Ion","Ear","Calf","Eye","Thumb","Flip","Leaf"]
   },
   {
     "title": "",
