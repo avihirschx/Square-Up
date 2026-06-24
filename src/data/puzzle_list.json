@@ -35,9 +35,9 @@
       "top": "Peppers",
       "right": "Temperatures",
       "bottom": "Bath___",
-      "left": "Often Haunted"
+      "left": "Haunted"
     },
-    "cells": ["Ghost","Bell","Dr.","Hot","Cool","Ambient","Room","Robe","House","Water","Rock","Dark"]
+    "cells": ["Ghost","Bell","Dr.","Hot","Cool","Ambient","Room","Robe","Water","House","Grave","Spooky"]
   },
   {
     "title": "Lethal",
