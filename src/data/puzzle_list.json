@@ -40,6 +40,16 @@
     "cells": ["Ghost","Bell","Dr.","Hot","Cool","Ambient","Room","Robe","House","Water","Rock","Dark"]
   },
   {
+    "title": "Lethal",
+    "names": {
+      "top": "Fishing technique",
+      "right": "Traps",
+      "bottom": "Coverings",
+      "left": "Battle equipment"
+    },
+    "cells": ["Spear","Hook","Dynamite","Net","Cage","Trap","Cover","Umbrella","Shell","Armor","Sword","Axe"]
+  },
+  {
     "title": "Two by Four",
     "names": {
       "top": "State abbreviations",
@@ -90,17 +100,7 @@
     "cells": ["Southwest","United","Spirit","Delta","Beta","Alpha","Gamma","Sting","Ultraviolet","X","Treasure Chest","Dotted Line"]
   },
   {
-    "title": "What are the connections?",
-    "names": {
-      "top": "Milk types",
-      "right": "Animal without first letter",
-      "bottom": "Body parts that come in pairs",
-      "left": "Peruse"
-    },
-    "cells": ["Skim","Coconut","Whole","Oat","Ow","Ion","Ear","Calf","Eye","Thumb","Flip","Leaf"]
-  },
-  {
-    "title": "",
+    "title": "Hear Hear!",
     "names": {
       "top": "_Berry",
       "right": "Has Feathers",
@@ -118,5 +118,56 @@
       "left": "Tree Parts"
     },
     "cells": ["Log","Times","Plus","Tan","Nap","Read","Surf","Skim","Scan","Leaf","Bud","Stump"]
+  },
+  {
+    "title": "Multicultural",
+    "names": {
+      "top": "Card games",
+      "right": "Organs",
+      "bottom": "Beans",
+      "left": "Words of Spanish origin"
+    },
+    "cells": ["Uno","Bridge","Poker","Hearts","Brains","Lungs","Kidneys","Green","Black","Pinto","Siesta","Taco"]
+  },
+  {
+    "title": "Grocery List",
+    "names": {
+      "top": "Types of Fries",
+      "right": "Root vegetables",
+      "bottom": "How to make a snowman",
+      "left": "Sweet Treat dessert \"Cones\""
+    },
+    "cells": ["Waffle","French","Curly","Sweet Potato","Radish","Beet","Carrot","Sticks","Scarf","Snow","Cake","Sugar"]
+  },
+  {
+    "title": "A Lazy Day",
+    "names": {
+      "top": "Type of Shoe",
+      "right": "Dog commands",
+      "bottom": "Tremble",
+      "left": "Found at the playground"
+    },
+    "cells": ["Slide","Flat","Boot","Heel","Speak","Come","Shake","Wave","Wobble","Swing","Sandpit","Jump Rope"]
+  },
+  {
+    "title": "Who are you?",
+    "names": {
+      "top": "NATO alphabet",
+      "right": "Associated With Green",
+      "bottom": "Abstract Strategy Board Games",
+      "left": "Title Shakespeare Characters"
+    },
+    "cells": ["Juliet","Oscar","Victor","Golf","Nature","Envy","Go","Chess","Shogi","Othello","Hamlet","Macbeth"]
+  },
+
+  {
+    "title": "What are the connections?",
+    "names": {
+      "top": "Milk types",
+      "right": "Animal without first letter",
+      "bottom": "Body parts that come in pairs",
+      "left": "Peruse"
+    },
+    "cells": ["Skim","Coconut","Whole","Oat","Ow","Ion","Ear","Calf","Eye","Thumb","Flip","Leaf"]
   }
 ]
