@@ -14,23 +14,25 @@ function gridFromHistory(history) {
     .join("\n");
 }
 
-export function buildShareText({ name, dayNumber, revealed, history, url }) {
+export function buildShareText({ name, dayNumber, revealed, history, url, hintsUsed }) {
   const heading =
     dayNumber != null ? `Square Up #${dayNumber}` : name ? `Square Up — ${name}` : "Square Up";
 
   const tries = (history || []).length;
   const grid = gridFromHistory(history);
-  const result = revealed
-    ? "Gave up 🏳️"
-    : `Solved in ${tries}/4 ✅`;
+
+  // Show number of hints used (0, 1 or 2) and include it explicitly in the share text.
+  const count = Math.min(2, Math.max(0, Number(hintsUsed || 0)));
+  const hintLine = `Hints used: ${count}`;
 
   // Prefer the puzzle's own share link (carries the whole puzzle) so the
   // recipient can play the exact same one; fall back to the current page.
-  const link =
-    url ||
-    (typeof window !== "undefined" ? window.location.origin + window.location.pathname : "");
+//  const link =
+//    url ||
+//    (typeof window !== "undefined" ? window.location.origin + window.location.pathname : "");
+  // to make sharing cleaner, I've removed the link from the share result
 
-  return [heading, grid, result, link].filter(Boolean).join("\n");
+  return [heading, hintLine, grid].filter(Boolean).join("\n");
 }
 
 // Copy to clipboard, preferring the native share sheet on mobile.

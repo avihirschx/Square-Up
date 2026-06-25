@@ -387,7 +387,7 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
 
   async function onShare() {
     const url = source ? buildShareUrl(source) : undefined;
-    const text = buildShareText({ name, revealed, history, url });
+    const text = buildShareText({ name, revealed, history, url, hintsUsed: hints.length });
     const r = await shareResult(text);
     setShareMsg(r === "failed" ? "Couldn't copy" : r === "shared" ? "Shared!" : "Copied!");
     setTimeout(() => setShareMsg(""), 2200);
@@ -548,44 +548,6 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
         </div>
       )}
 
-      <div style={{ display: "flex", alignItems: "center", gap: "9px", marginBottom: "16px", minHeight: "16px" }}>
-        <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "#555" }}>
-          Attempts
-        </span>
-        <div style={{ display: "flex", gap: "5px" }}>
-          {Array.from({ length: MAX_ATTEMPTS }).map((_, i) => (
-            <span key={i} style={{
-              width: "10px", height: "10px", borderRadius: "50%",
-              background: i < wrongCount ? "#E8433A" : "#2e2e3e",
-              boxShadow: i < wrongCount ? "0 0 6px rgba(232,67,58,0.55)" : "none",
-              transition: "background 0.3s, box-shadow 0.3s",
-            }} />
-          ))}
-        </div>
-        <span style={{ fontSize: "11px", fontWeight: 700, color: solved || revealed ? "#555" : attemptsLeft === 1 && !solving ? "#E8433A" : "#666" }}>
-          {solved ? "solved" : revealed ? "answer shown" : solving ? "solving…" : `${attemptsLeft} left`}
-        </span>
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: "9px", marginBottom: "18px", minHeight: "16px" }}>
-        <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "#555" }}>
-          Sides
-        </span>
-        <div style={{ display: "flex", gap: "5px" }}>
-          {["top", "right", "bottom", "left"].map((side) => (
-            <span key={side} style={{
-              width: "12px", height: "12px", borderRadius: "3px",
-              background: activeSides
-                ? colors[activeSides[side]].bg
-                : satisfiedSides[side] ? colors[satisfiedSides[side]].bg : "#2e2e3e",
-              transition: "background 0.3s",
-            }} />
-          ))}
-        </div>
-        <span style={{ fontSize: "11px", fontWeight: 700, color: "#888" }}>
-          {(activeSides ? 4 : satisfiedCount)}/4
-        </span>
-      </div>
 
       <div style={{
         position: "relative",
@@ -767,6 +729,45 @@ export default function PlayPuzzle({ puzzle, subtitle, name, source, saved, onSa
       </div>
 
       </div>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "9px", marginBottom: "16px", minHeight: "16px" }}>
+        <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "#555" }}>
+          Attempts
+        </span>
+        <div style={{ display: "flex", gap: "5px" }}>
+          {Array.from({ length: MAX_ATTEMPTS }).map((_, i) => (
+            <span key={i} style={{
+              width: "10px", height: "10px", borderRadius: "50%",
+              background: i < wrongCount ? "#E8433A" : "#2e2e3e",
+              boxShadow: i < wrongCount ? "0 0 6px rgba(232,67,58,0.55)" : "none",
+              transition: "background 0.3s, box-shadow 0.3s",
+            }} />
+          ))}
+        </div>
+        <span style={{ fontSize: "11px", fontWeight: 700, color: solved || revealed ? "#555" : attemptsLeft === 1 && !solving ? "#E8433A" : "#666" }}>
+          {solved ? "solved" : revealed ? "answer shown" : solving ? "solving…" : `${attemptsLeft} left`}
+        </span>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "9px", marginBottom: "18px", minHeight: "16px" }}>
+        <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "#555" }}>
+          Sides
+        </span>
+        <div style={{ display: "flex", gap: "5px" }}>
+          {["top", "right", "bottom", "left"].map((side) => (
+            <span key={side} style={{
+              width: "12px", height: "12px", borderRadius: "3px",
+              background: activeSides
+                ? colors[activeSides[side]].bg
+                : satisfiedSides[side] ? colors[satisfiedSides[side]].bg : "#2e2e3e",
+              transition: "background 0.3s",
+            }} />
+          ))}
+        </div>
+        <span style={{ fontSize: "11px", fontWeight: 700, color: "#888" }}>
+          {(activeSides ? 4 : satisfiedCount)}/4
+        </span>
       </div>
 
       <div style={{
