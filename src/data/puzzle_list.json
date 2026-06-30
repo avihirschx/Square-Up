@@ -159,7 +159,6 @@
     },
     "cells": ["Juliet","Oscar","Victor","Golf","Nature","Envy","Go","Chess","Shogi","Othello","Hamlet","Macbeth"]
   },
-
   {
     "title": "What are the connections?",
     "names": {
@@ -169,5 +168,45 @@
       "left": "Peruse"
     },
     "cells": ["Skim","Coconut","Whole","Oat","Ow","Ion","Ear","Calf","Eye","Thumb","Flip","Leaf"]
+  },
+  {
+    "title": "Avi's Puzzle 2",
+    "names": {
+      "top": "Circles",
+      "right": "Famous Chris(topher)s",
+      "bottom": "Black _",
+      "left": "Photo Editing Functions"
+    },
+    "cells": ["Crop","Hell","Life","Columbus","Pine","Brown","Rock","Death","Jack","Mirror","Filter","Tint"]
+  },
+  {
+    "title": "Piecing it together",
+    "names": {
+      "top": "Toy story characters",
+      "right": "Portmanteau",
+      "bottom": "Types of pants",
+      "left": "Cowboy / Western words"
+    },
+    "cells": ["Sheriff","T-rex","Piggy Bank","Spork","Smog","Podcast","Jeggings","Parachute","Cargo","Chaps","Lasso","Saddle"]
+  },
+  {
+    "title": "Ze'ev's puzzle",
+    "names": {
+      "top": "Screws",
+      "right": "Hammers",
+      "bottom": "Music",
+      "left": "Green ___"
+    },
+    "cells": ["Thumb","Wood","Worm","Jack","Claw","Sledge","Club","Funk","Jazz","House","Onion","Goblin"]
+  },
+  {
+    "title": "",
+    "names": {
+      "top": "Wild cats",
+      "right": "Men’s scents",
+      "bottom": "Cutting tools",
+      "left": "At a construction site"
+    },
+    "cells": ["Bobcat","Leopard","Ocelot","Lynx","Old Spice","Irish Spring","Axe","Cleaver","Knife","Scissor","Crane","Fork"]
   }
 ]
